@@ -6,390 +6,93 @@ import {
   Briefcase,
   Building2
 } from "lucide-react";
-
+import { useState, useEffect } from "react";
 
 export default function FacultyProfile() {
-
-
-return (
-
-
-<div className="
-min-h-screen
-bg-slate-50
-p-8
-">
-
-
-<div className="
-max-w-6xl
-mx-auto
-space-y-8
-">
-
-
-
-
-
-
-
-{/* Profile Header */}
-
-
-<div className="
-bg-white
-border
-border-slate-200
-rounded-3xl
-shadow-sm
-p-8
-">
-
-
-<div className="
-flex
-items-center
-gap-5
-">
-
-
-<div className="
-bg-slate-800
-text-white
-p-5
-rounded-2xl
-">
-
-
-<User size={40}/>
-
-
-</div>
-
-
-
-
-<div>
-
-
-<h1 className="
-text-3xl
-font-bold
-text-slate-800
-">
-
-Dr. Ahmed Ali
-
-</h1>
-
-
-<p className="
-text-slate-500
-mt-1
-">
-
-Assistant Professor - Computer Science
-
-</p>
-
-
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-
-{/* Personal Information */}
-
-
-
-<div className="
-bg-white
-border
-border-slate-200
-rounded-3xl
-shadow-sm
-p-8
-">
-
-
-<h2 className="
-text-xl
-font-bold
-text-slate-800
-mb-6
-">
-
-Personal Information
-
-</h2>
-
-
-
-
-
-<div className="
-grid
-md:grid-cols-2
-gap-6
-">
-
-
-
-
-
-<InfoCard
-
-icon={<User size={20}/>}
-title="Full Name"
-value="Dr. Ahmed Ali"
-
-/>
-
-
-
-<InfoCard
-
-icon={<Mail size={20}/>}
-title="Email"
-value="ahmed.ali@university.edu"
-
-/>
-
-
-
-<InfoCard
-
-icon={<Phone size={20}/>}
-title="Phone"
-value="+92 300 1234567"
-
-/>
-
-
-
-<InfoCard
-
-icon={<Building2 size={20}/>}
-title="Department"
-value="Computer Science"
-
-/>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-
-
-{/* Qualification */}
-
-
-
-<div className="
-bg-white
-border
-border-slate-200
-rounded-3xl
-shadow-sm
-p-8
-">
-
-
-
-<h2 className="
-text-xl
-font-bold
-text-slate-800
-mb-6
-flex
-items-center
-gap-2
-">
-
-
-<GraduationCap/>
-
-Qualifications
-
-
-</h2>
-
-
-
-
-<div className="
-space-y-4
-">
-
-
-
-<Qualification
-
-degree="PhD Computer Science"
-institute="FAST National University"
-year="2022"
-
-/>
-
-
-
-<Qualification
-
-degree="MS Software Engineering"
-institute="NUST Islamabad"
-year="2017"
-
-/>
-
-
-
-<Qualification
-
-degree="BS Computer Science"
-institute="University of Karachi"
-year="2014"
-
-/>
-
-
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-
-{/* University Position */}
-
-
-
-<div className="
-bg-white
-border
-border-slate-200
-rounded-3xl
-shadow-sm
-p-8
-">
-
-
-<h2 className="
-text-xl
-font-bold
-text-slate-800
-mb-6
-flex
-items-center
-gap-2
-">
-
-
-<Briefcase/>
-
-University Position
-
-
-</h2>
-
-
-
-
-<div className="
-grid
-md:grid-cols-2
-gap-6
-">
-
-
-
-<InfoCard
-
-icon={<Briefcase size={20}/>}
-title="Current Post"
-value="Assistant Professor"
-
-/>
-
-
-
-
-<InfoCard
-
-icon={<Building2 size={20}/>}
-title="Faculty"
-value="Faculty of Computing"
-
-/>
-
-
-
-
-<InfoCard
-
-icon={<GraduationCap size={20}/>}
-title="Experience"
-value="8 Years Teaching Experience"
-
-/>
-
-
-
-<InfoCard
-
-icon={<User size={20}/>}
-title="Courses Teaching"
-value="Database Systems, AI, Networks"
-
-/>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-</div>
-
-
-</div>
-
-
-);
-
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const faculty = {
+    name: user?.name || "Instructor Name",
+    email: user?.email || "instructor@university.edu",
+    role: user?.role || "Instructor",
+    department: "Faculty of Computing",
+    phone: "+92 300 1234567",
+    designation: "Assistant Professor",
+    experience: "8 Years Teaching Experience",
+    courses: "Database Systems, AI, Networks"
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+
+        {/* Profile Header */}
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+          <div className="flex items-center gap-5">
+            <div className="bg-slate-800 text-white p-5 rounded-2xl">
+              <User size={40}/>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800">
+                {faculty.name}
+              </h1>
+              <p className="text-slate-500 mt-1">
+                {faculty.designation} - {faculty.department}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Personal Information */}
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+          <h2 className="text-xl font-bold text-slate-800 mb-6">
+            Personal Information
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <InfoCard icon={<User size={20}/>} title="Full Name" value={faculty.name} />
+            <InfoCard icon={<Mail size={20}/>} title="Email" value={faculty.email} />
+            <InfoCard icon={<Phone size={20}/>} title="Phone" value={faculty.phone} />
+            <InfoCard icon={<Building2 size={20}/>} title="Department" value={faculty.department} />
+          </div>
+        </div>
+
+        {/* Qualification */}
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <GraduationCap/>
+            Qualifications
+          </h2>
+          <div className="space-y-4">
+            <Qualification degree="PhD Computer Science" institute="FAST National University" year="2022" />
+            <Qualification degree="MS Software Engineering" institute="NUST Islamabad" year="2017" />
+            <Qualification degree="BS Computer Science" institute="University of Karachi" year="2014" />
+          </div>
+        </div>
+
+        {/* University Position */}
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Briefcase/>
+            University Position
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <InfoCard icon={<Briefcase size={20}/>} title="Current Post" value={faculty.designation} />
+            <InfoCard icon={<Building2 size={20}/>} title="Faculty" value={faculty.department} />
+            <InfoCard icon={<GraduationCap size={20}/>} title="Experience" value={faculty.experience} />
+            <InfoCard icon={<User size={20}/>} title="Courses Teaching" value={faculty.courses} />
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 
 

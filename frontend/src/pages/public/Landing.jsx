@@ -5,46 +5,34 @@ import SchoolIcon from "@mui/icons-material/School";
 import GroupsIcon from "@mui/icons-material/Groups";
 
 import PortalCard from "../../components/PortalCard";
+import landingBg from "../../assets/images/landing-bg.jpg";
 
 export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <main className="max-w-7xl mx-auto pt-16">
+    <div 
+      className="min-h-screen px-6 py-8 relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${landingBg})` }}
+    >
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]" />
+      <main className="max-w-7xl mx-auto pt-16 relative z-10">
 
-        {/* Welcome */}
-        <div className="text-center mb-14">
-          <span
-            className="
-              inline-block
-              rounded-full
-              border
-              border-slate-300
-              bg-white
-              px-5
-              py-2
-              text-xs
-              font-semibold
-              uppercase
-              tracking-[0.15em]
-              text-slate-600
-            "
-          >
-            Welcome
-          </span>
-
-          <h2 className="mt-6 text-2xl md:text-3xl font-bold text-slate-900">
-            Select Your Portal
-          </h2>
-
-          <p className="mt-3 text-slate-500">
-            Sign in using your university credentials.
+        {/* Banner Text */}
+        <div 
+          className="mb-16 text-left max-w-3xl mt-12 md:mt-24"
+          style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
+        >
+          <h1 className="text-5xl md:text-[5.5rem] font-bold text-slate-300 uppercase leading-[1.05] drop-shadow-2xl">
+            Select Your<br/>Portal.
+          </h1>
+          <p className="mt-6 text-xl md:text-2xl font-bold text-slate-400 uppercase drop-shadow-md tracking-wide">
+            Smart LMS Ecosystem
           </p>
         </div>
 
         {/* Portal Cards */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 mt-10">
 
           {/* Student Portal */}
           <PortalCard
@@ -74,7 +62,7 @@ export default function Landing() {
 
         {/* Support */}
         <div className="mt-16 text-center">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-300 drop-shadow-md font-medium">
             Need help signing in? Contact your university IT support.
           </p>
         </div>

@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Landing from "./pages/public/Landing";
 import Login from "./pages/public/Login";
+import Signup from "./pages/public/Signup";
 
 import StudentLayout from "./layouts/StudentLayout";
 import FacultyLayout from "./layouts/FacultyLayout";
 import AdminLayout from "./layouts/AdminLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 
 // Student
@@ -13,7 +15,7 @@ import Dashboard from "./pages/student/Dashboard";
 import MyCourses from "./pages/student/MyCourses";
 import ViewCourse from "./pages/student/ViewCourse";
 import Assignments from "./pages/student/Assignments";
-import UploadAssignment from "./pages/student/UploadAssignment";
+import SubmitAssignment from "./pages/student/SubmitAssignment";
 import Grades from "./pages/student/Grades";
 import Quizzes from "./pages/student/Quizzes";
 import Profile from "./pages/student/Profile";
@@ -27,7 +29,13 @@ import CreateAssignment from "./pages/faculty/CreateAssignment";
 import CreateQuiz from "./pages/faculty/CreateQuiz";
 import Attendance from "./pages/faculty/Attendance";
 import ViewSubmissions from "./pages/faculty/ViewSubmissions";
+import FacultyCourses from "./pages/faculty/MyCourses";
 import FacultyProfile from "./pages/faculty/FacultyProfile";
+import FacultyAssignments from "./pages/faculty/FacultyAssignments";
+import AutoGrading from "./pages/faculty/AutoGrading";
+import Plagiarism from "./pages/faculty/Plagiarism";
+import MidTermReports from "./pages/faculty/MidTermReports";
+import Analytics from "./pages/faculty/Analytics";
 
 
 // // Admin
@@ -35,6 +43,7 @@ import FacultyProfile from "./pages/faculty/FacultyProfile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import RegisterStudent from "./pages/admin/RegisterStudent";
 import RegisterTeacher from "./pages/admin/RegisterTeacher";
+import AssignCourse from "./pages/admin/AssignCourse";
 
 
 function App() {
@@ -54,6 +63,7 @@ element={<Landing />}
 />
 
 <Route path="/login/:role" element={<Login />} />
+<Route path="/signup/:role" element={<Signup />} />
 
 
 
@@ -64,7 +74,11 @@ element={<Landing />}
 
 <Route 
   path="/admin" 
-  element={<AdminLayout />}
+  element={
+    <ProtectedRoute allowedRoles={["Admin"]}>
+      <AdminLayout />
+    </ProtectedRoute>
+  }
 >
 
   <Route 
@@ -87,6 +101,11 @@ element={<Landing />}
     element={<RegisterTeacher />} 
   />
 
+  <Route 
+    path="assign-course" 
+    element={<AssignCourse />} 
+  />
+
 </Route>
 
 
@@ -99,7 +118,11 @@ element={<Landing />}
 
 <Route 
 path="/student" 
-element={<StudentLayout />}
+element={
+  <ProtectedRoute allowedRoles={["Student"]}>
+    <StudentLayout />
+  </ProtectedRoute>
+}
 >
 
 
@@ -135,7 +158,7 @@ element={<Assignments />}
 
 <Route 
 path="submit-assignment" 
-element={<UploadAssignment />} 
+element={<SubmitAssignment />} 
 />
 
 
@@ -172,7 +195,11 @@ element={<Profile />}
 
 <Route 
 path="/faculty" 
-element={<FacultyLayout />}
+element={
+  <ProtectedRoute allowedRoles={["Instructor"]}>
+    <FacultyLayout />
+  </ProtectedRoute>
+}
 >
 
 
@@ -185,6 +212,12 @@ element={<FacultyDashboard />}
 <Route 
 path="dashboard" 
 element={<FacultyDashboard />} 
+/>
+
+
+<Route 
+path="courses" 
+element={<FacultyCourses />} 
 />
 
 
@@ -242,6 +275,12 @@ element={<ViewSubmissions />}
 path="profile" 
 element={<FacultyProfile />} 
 />
+
+<Route path="assignments" element={<FacultyAssignments />} />
+<Route path="auto-grading" element={<AutoGrading />} />
+<Route path="plagiarism" element={<Plagiarism />} />
+<Route path="mid-term-reports" element={<MidTermReports />} />
+<Route path="analytics" element={<Analytics />} />
 
 
 

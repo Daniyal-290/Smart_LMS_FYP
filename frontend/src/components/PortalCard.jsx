@@ -16,13 +16,15 @@ export default function PortalCard({
           h-44
           overflow-hidden
           rounded-2xl
-          bg-white
+          bg-white/10
+          backdrop-blur-md
           border
-          border-slate-300
-          shadow-[0_8px_24px_rgba(15,23,42,0.08)]
-          hover:shadow-[0_18px_45px_rgba(15,23,42,0.14)]
+          border-white/30
+          shadow-lg
+          hover:shadow-2xl
           hover:-translate-y-1.5
-          hover:border-slate-400
+          hover:border-white/50
+          hover:bg-white/20
           transition-all
           duration-300
           flex
@@ -39,7 +41,9 @@ export default function PortalCard({
             top-0
             h-full
             w-1.5
-            bg-slate-600
+            bg-white/60
+            transition-colors
+            group-hover:bg-amber-400
           "
         />
 
@@ -52,15 +56,16 @@ export default function PortalCard({
             w-20
             h-20
             rounded-2xl
-            bg-slate-50
+            bg-white/10
             border
-            border-slate-200
-            text-slate-700
+            border-white/20
+            text-white
             shadow-sm
             transition-all
             duration-300
             group-hover:scale-105
-            group-hover:bg-slate-100
+            group-hover:bg-white/20
+            group-hover:border-white/40
           "
         >
           {icon}
@@ -72,7 +77,7 @@ export default function PortalCard({
             className="
               text-xl
               font-bold
-              text-slate-900
+              text-white
               tracking-tight
             "
           >
@@ -84,7 +89,7 @@ export default function PortalCard({
               mt-2
               text-sm
               leading-relaxed
-              text-slate-600
+              text-slate-200
             "
           >
             {description}
@@ -98,8 +103,8 @@ export default function PortalCard({
               gap-2
               text-sm
               font-semibold
-              text-slate-700
-              group-hover:text-slate-900
+              text-white/80
+              group-hover:text-amber-400
               transition-colors
             "
           >

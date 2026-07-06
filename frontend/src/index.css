@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Times New Roman", Times, serif;
+  --font-serif: "Times New Roman", Times, serif;
+}
+
 html,
 body,
 #root {
@@ -22,7 +27,7 @@ html {
 }
 
 body {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: "Times New Roman", Times, serif;
   color: #334155;
   line-height: 1.6;
 

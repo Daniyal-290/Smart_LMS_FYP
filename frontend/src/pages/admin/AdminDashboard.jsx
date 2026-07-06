@@ -3,6 +3,7 @@ import {
   GraduationCap,
   UserPlus,
   ArrowRight,
+  BookOpen
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -207,11 +208,9 @@ export default function AdminDashboard() {
 
 
           <button
-
             onClick={() =>
               navigate("/admin/register-teacher")
             }
-
             className="
             flex
             items-center
@@ -223,24 +222,34 @@ export default function AdminDashboard() {
             hover:bg-slate-700
             transition
             "
-
           >
-
             <div className="flex items-center gap-3">
-
               <UserPlus size={22}/>
-
               Register Teacher
-
             </div>
-
-
             <ArrowRight size={20}/>
-
-
           </button>
 
-
+          <button
+            onClick={() => navigate("/admin/assign-course")}
+            className="
+            flex
+            items-center
+            justify-between
+            bg-slate-800
+            text-white
+            p-5
+            rounded-xl
+            hover:bg-slate-700
+            transition
+            "
+          >
+            <div className="flex items-center gap-3">
+              <BookOpen size={22}/>
+              Assign Course
+            </div>
+            <ArrowRight size={20}/>
+          </button>
 
         </div>
 

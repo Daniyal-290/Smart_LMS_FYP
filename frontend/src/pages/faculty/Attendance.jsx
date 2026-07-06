@@ -709,6 +709,10 @@ Late
 </th>
 
 <th className="p-5">
+Absent
+</th>
+
+<th className="p-5">
 Status
 </th>
 
@@ -791,6 +795,26 @@ updateStatus(student.id,"Late")
 }
 
 className="w-5 h-5 accent-yellow-500"
+
+/>
+
+
+</td>
+
+<td className="text-center">
+
+
+<input
+
+type="checkbox"
+
+checked={student.status==="Absent"}
+
+onChange={()=>
+updateStatus(student.id,"Absent")
+}
+
+className="w-5 h-5 accent-red-600"
 
 />
 

@@ -1,205 +1,98 @@
-export default function Grades() {
-  const currentSemester = [
-    {
-      course: "Data Structures & Algorithms",
-      code: "CS301",
-      credits: 3,
-      grade: "A",
-    },
-    {
-      course: "Database Management Systems",
-      code: "CS305",
-      credits: 3,
-      grade: "B+",
-    },
-    {
-      course: "Software Engineering",
-      code: "CS307",
-      credits: 3,
-      grade: "A-",
-    },
-    {
-      course: "Computer Networks",
-      code: "CS309",
-      credits: 3,
-      grade: "A",
-    },
-    {
-      course: "Operating Systems",
-      code: "CS311",
-      credits: 3,
-      grade: "B+",
-    },
-    {
-      course: "Artificial Intelligence",
-      code: "CS313",
-      credits: 3,
-      grade: "A",
-    },
-  ];
+import { useState, useEffect } from "react";
 
-  const previousSemesters = [
-    {
-      semester: "Semester 1",
-      gpa: "3.41",
-      cgpa: "3.41",
-    },
-    {
-      semester: "Semester 2",
-      gpa: "3.55",
-      cgpa: "3.48",
-    },
-    {
-      semester: "Semester 3",
-      gpa: "3.62",
-      cgpa: "3.53",
-    },
-    {
-      semester: "Semester 4",
-      gpa: "3.58",
-      cgpa: "3.54",
-    },
-    {
-      semester: "Semester 5",
-      gpa: "3.61",
-      cgpa: "3.56",
-    },
-  ];
+const API_URL = "http://localhost:5000/api";
+
+export default function Grades() {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchGrades = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/submissions/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (!res.ok) {
+          throw new Error("Failed to fetch grades");
+        }
+        
+        const data = await res.json();
+        setSubmissions(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchGrades();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center py-10 text-slate-500">Loading grades...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-10 text-red-500">Error: {error}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 p-8">
-
       {/* Heading */}
-
       <div className="mb-8">
-
         <h1 className="text-3xl font-bold text-slate-800">
           Academic Results
         </h1>
-
         <p className="mt-2 text-slate-600">
-          View your semester grades and academic performance.
+          View your assignment grades and academic performance.
         </p>
-
       </div>
 
       {/* Current Semester */}
-
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-
         <div className="flex justify-between items-center mb-6">
-
           <h2 className="text-2xl font-bold text-slate-800">
-            Current Semester (Semester 6)
+            Recent Assignments
           </h2>
-
-          <div className="bg-slate-200 px-5 py-2 rounded-xl font-semibold text-slate-800">
-            GPA: 3.54
-          </div>
-
         </div>
 
-        <table className="w-full">
-
-          <thead>
-
-            <tr className="border-b border-slate-200 text-left">
-
-              <th className="py-3">Course Code</th>
-              <th>Course</th>
-              <th>Credits</th>
-              <th>Grade</th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {currentSemester.map((course) => (
-
-              <tr
-                key={course.code}
-                className="border-b border-slate-100"
-              >
-
-                <td className="py-4">{course.code}</td>
-
-                <td>{course.course}</td>
-
-                <td>{course.credits}</td>
-
-                <td className="font-semibold text-slate-800">
-                  {course.grade}
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-      </section>
-
-      {/* Previous Semesters */}
-
-      <section className="mt-8 bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">
-          Previous Semester Results
-        </h2>
-
-        <table className="w-full">
-
-          <thead>
-
-            <tr className="border-b border-slate-200 text-left">
-
-              <th className="py-3">Semester</th>
-              <th>Semester GPA</th>
-              <th>CGPA</th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {previousSemesters.map((semester) => (
-
-              <tr
-                key={semester.semester}
-                className="border-b border-slate-100"
-              >
-
-                <td className="py-4">
-                  {semester.semester}
-                </td>
-
-                <td>{semester.gpa}</td>
-
-                <td>{semester.cgpa}</td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-        <div className="mt-8 flex justify-end">
-
-          <div className="bg-slate-700 text-white rounded-xl px-6 py-3 font-semibold">
-            Overall CGPA: 3.56 / 4.00
+        {submissions.length === 0 ? (
+          <div className="text-slate-500 py-4 text-center">
+            No graded assignments found.
           </div>
-
-        </div>
-
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200 text-left">
+                <th className="py-3 text-slate-600">Course</th>
+                <th className="text-slate-600">Assignment</th>
+                <th className="text-slate-600">Total Points</th>
+                <th className="text-slate-600">Your Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.map((sub) => (
+                <tr
+                  key={sub._id}
+                  className="border-b border-slate-100 hover:bg-slate-50 transition"
+                >
+                  <td className="py-4 font-medium text-slate-800">
+                    {sub.assignment?.course?.title || "Unknown Course"}
+                  </td>
+                  <td className="text-slate-600">{sub.assignment?.title || "Unknown"}</td>
+                  <td className="text-slate-600">{sub.assignment?.totalPoints || 100}</td>
+                  <td className="font-semibold text-slate-800">
+                    {sub.aiGrade || "Not Graded Yet"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
-
     </div>
   );
 }

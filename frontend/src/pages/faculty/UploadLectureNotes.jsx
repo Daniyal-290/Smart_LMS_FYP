@@ -1,25 +1,49 @@
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
 import { toast } from "react-toastify";
+import { useParams, useNavigate } from "react-router-dom";
+
+const API_URL = "http://localhost:5000/api";
 
 export default function UploadLectureNotes() {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!title.trim() || !file) {
       toast.error("Please enter the lecture title and select a file.");
       return;
     }
 
-    toast.success("Lecture uploaded successfully!");
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("courseId", id);
+    formData.append("file", file);
 
-    // Clear form
-    setTitle("");
-    setFile(null);
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/lectures`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-    // Reset file input
-    document.getElementById("lecture-file").value = "";
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Lecture uploaded successfully!");
+        navigate(`/faculty/course/${id}`);
+      } else {
+        toast.error(data.message || "Failed to upload lecture.");
+      }
+    } catch (error) {
+      toast.error("Server error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,9 +94,10 @@ export default function UploadLectureNotes() {
           {/* Upload Button */}
           <button
             onClick={handleUpload}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition"
+            disabled={loading}
+            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition disabled:opacity-50"
           >
-            Upload Notes
+            {loading ? "Uploading..." : "Upload Notes"}
           </button>
         </div>
       </div>

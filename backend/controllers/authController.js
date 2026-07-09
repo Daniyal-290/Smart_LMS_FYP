@@ -167,6 +167,9 @@ const registerFaculty = async (req, res) => {
     });
   } catch (error) {
     console.error("Faculty Registration Error:", error.message);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: Object.values(error.errors).map(v => v.message).join(", ") });
+    }
     res.status(500).json({ message: "Server error during registration" });
   }
 };
@@ -244,11 +247,108 @@ const getUserStats = async (req, res) => {
   }
 };
 
+// ===================================================
+// GET /api/auth/students
+// ===================================================
+// Protected: Admin only
+const getStudents = async (req, res) => {
+  try {
+    const students = await User.find({ role: "Student" }).select("name email enrollmentId class program createdAt");
+    res.status(200).json(students);
+  } catch (error) {
+    console.error("Get Students Error:", error.message);
+    res.status(500).json({ message: "Server error fetching students" });
+  }
+};
+
+// ===================================================
+// PUT /api/auth/students/:id
+// ===================================================
+// Protected: Admin only
+const updateStudent = async (req, res) => {
+  try {
+    const { name, email, enrollmentId, class: userClass, program } = req.body;
+    const student = await User.findOne({ _id: req.params.id, role: "Student" });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    if (name) student.name = name;
+    if (email) student.email = email;
+    if (enrollmentId) student.enrollmentId = enrollmentId;
+    if (userClass) student.class = userClass;
+    if (program) student.program = program;
+
+    await student.save();
+    res.status(200).json({ message: "Student updated successfully", student });
+  } catch (error) {
+    console.error("Update Student Error:", error.message);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: Object.values(error.errors).map(v => v.message).join(", ") });
+    }
+    res.status(500).json({ message: "Server error updating student" });
+  }
+};
+
+// ===================================================
+// DELETE /api/auth/students/:id
+// ===================================================
+// Protected: Admin only
+const deleteStudent = async (req, res) => {
+  try {
+    const student = await User.findOneAndDelete({ _id: req.params.id, role: "Student" });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.status(200).json({ message: "Student deleted successfully" });
+  } catch (error) {
+    console.error("Delete Student Error:", error.message);
+    res.status(500).json({ message: "Server error deleting student" });
+  }
+};
+
+// ===================================================
+// PUT /api/auth/teachers/:id
+// ===================================================
+// Protected: Admin only
+const updateTeacher = async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const teacher = await User.findOne({ _id: req.params.id, role: "Instructor" });
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    if (name) teacher.name = name;
+    if (email) teacher.email = email;
+
+    await teacher.save();
+    res.status(200).json({ message: "Teacher updated successfully", teacher });
+  } catch (error) {
+    console.error("Update Teacher Error:", error.message);
+    res.status(500).json({ message: "Server error updating teacher" });
+  }
+};
+
+// ===================================================
+// DELETE /api/auth/teachers/:id
+// ===================================================
+// Protected: Admin only
+const deleteTeacher = async (req, res) => {
+  try {
+    const teacher = await User.findOneAndDelete({ _id: req.params.id, role: "Instructor" });
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    res.status(200).json({ message: "Teacher deleted successfully" });
+  } catch (error) {
+    console.error("Delete Teacher Error:", error.message);
+    res.status(500).json({ message: "Server error deleting teacher" });
+  }
+};
+
 module.exports = {
   signup,
   login,
   registerFaculty,
   registerStudent,
   getInstructors,
-  getUserStats
+  getUserStats,
+  getStudents,
+  updateStudent,
+  deleteStudent,
+  updateTeacher,
+  deleteTeacher,
 };

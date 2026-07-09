@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 export default function Landing() {
   const router = useRouter();
   const [navigating, setNavigating] = useState(null);
+  return (
     <div 
       className="min-h-screen px-6 py-8 relative bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: `url(/images/landing-bg.jpg)` }}

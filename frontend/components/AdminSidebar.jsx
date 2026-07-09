@@ -5,7 +5,9 @@ import {
   UserPlus,
   GraduationCap,
   LogOut,
-  BookOpen
+  BookOpen,
+  Users,
+  List,
 } from "lucide-react";
 
 import { useRouter, usePathname } from "next/navigation";
@@ -34,6 +36,21 @@ export default function AdminSidebar(){
       title:"Assign Course",
       icon:<BookOpen size={20}/>,
       path:"/admin/assign-course"
+    },
+    {
+      title:"Manage Students",
+      icon:<Users size={20}/>,
+      path:"/admin/students"
+    },
+    {
+      title:"Manage Teachers",
+      icon:<GraduationCap size={20}/>,
+      path:"/admin/teachers"
+    },
+    {
+      title:"Manage Courses",
+      icon:<List size={20}/>,
+      path:"/admin/courses"
     },
   ];
 

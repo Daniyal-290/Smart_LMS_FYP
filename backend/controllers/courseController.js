@@ -131,4 +131,47 @@ const enrollStudent = async (req, res) => {
   }
 };
 
-module.exports = { createCourse, getCourseById, getCourses, getAllCourses, enrollStudent };
+// ===================================================
+// PUT /api/courses/:id
+// ===================================================
+// Protected: Admin only
+// Update a course's details
+const updateCourse = async (req, res) => {
+  try {
+    const { title, courseCode, credits, description, instructorId } = req.body;
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    if (title) course.title = title;
+    if (courseCode !== undefined) course.courseCode = courseCode;
+    if (credits !== undefined) course.credits = credits;
+    if (description !== undefined) course.description = description;
+    if (instructorId) course.instructor = instructorId;
+
+    await course.save();
+    const updated = await Course.findById(course._id).populate("instructor", "name email").populate("students", "name");
+    res.status(200).json({ message: "Course updated successfully", course: updated });
+  } catch (error) {
+    console.error("Update Course Error:", error.message);
+    res.status(500).json({ message: "Server error updating course" });
+  }
+};
+
+// ===================================================
+// DELETE /api/courses/:id
+// ===================================================
+// Protected: Admin only
+// Delete a course
+const deleteCourse = async (req, res) => {
+  try {
+    const course = await Course.findByIdAndDelete(req.params.id);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    res.status(200).json({ message: "Course deleted successfully" });
+  } catch (error) {
+    console.error("Delete Course Error:", error.message);
+    res.status(500).json({ message: "Server error deleting course" });
+  }
+};
+
+module.exports = { createCourse, getCourseById, getCourses, getAllCourses, enrollStudent, updateCourse, deleteCourse };
+

@@ -117,6 +117,10 @@ const createSubmission = async (req, res) => {
 const getMyGrades = async (req, res) => {
   try {
     const submissions = await Submission.find({ student: req.user._id })
+      // Exclude pendingAiGrade/pendingAiFeedback — those are unpublished,
+      // teacher-review-only fields and must never reach a student, even
+      // via the raw API response.
+      .select("-pendingAiGrade -pendingAiFeedback")
       .populate({
         path: "assignment",
         select: "title course dueDate totalPoints",

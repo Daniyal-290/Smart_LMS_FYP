@@ -1,4 +1,9 @@
+# Ignore all node_modules folders
+
 node_modules/
 .next/
+
+# Ignore every .env file
+
 .env
 uploads/

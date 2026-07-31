@@ -45,6 +45,21 @@ const assignmentSchema = new mongoose.Schema(
       type: String, // The original name of the file for display
       default: "",
     },
+
+    // -------------------------------------------------
+    // Rubric file (uploaded by teacher at grading time, parsed
+    // by Gemini into rubric.criteria above, saved for reuse on
+    // future re-grades) — added for the AI grading engine.
+    // -------------------------------------------------
+    rubricFileUrl: {
+      type: String,
+      default: "",
+    },
+
+    rubricOriginalFileName: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

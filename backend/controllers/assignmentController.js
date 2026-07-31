@@ -110,4 +110,85 @@ const getCourseAssignments = async (req, res) => {
     }
   };
 
-module.exports = { createAssignment, getAssignments, getCourseAssignments };
+module.exports = {
+  createAssignment,
+  getAssignments,
+  getCourseAssignments,
+  updateAssignment,
+  deleteAssignment,
+};
+
+// ===================================================
+// PUT /api/assignments/:id
+// ===================================================
+// Protected: Instructor (owner) / Admin
+// Update an assignment's title, dueDate, totalPoints, or attachment.
+async function updateAssignment(req, res) {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    const course = await Course.findById(assignment.course);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found for this assignment" });
+    }
+
+    if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Not authorized to edit this assignment" });
+    }
+
+    const { title, dueDate, totalPoints } = req.body;
+
+    if (title !== undefined) assignment.title = title;
+    if (dueDate !== undefined) assignment.dueDate = dueDate;
+    if (totalPoints !== undefined) assignment.totalPoints = totalPoints;
+
+    if (req.file) {
+      assignment.attachmentUrl = `/uploads/${req.file.filename}`;
+      assignment.originalFileName = req.file.originalname;
+    }
+
+    await assignment.save();
+
+    res.status(200).json({ message: "Assignment updated successfully", assignment });
+  } catch (error) {
+    console.error("Update Assignment Error:", error.message);
+    res.status(500).json({ message: "Server error updating assignment" });
+  }
+}
+
+// ===================================================
+// DELETE /api/assignments/:id
+// ===================================================
+// Protected: Instructor (owner) / Admin
+// Deletes the assignment AND its submissions (cascade), since a
+// submission with no assignment to point to would be an orphaned record.
+async function deleteAssignment(req, res) {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    const course = await Course.findById(assignment.course);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found for this assignment" });
+    }
+
+    if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Not authorized to delete this assignment" });
+    }
+
+    const { deletedCount } = await Submission.deleteMany({ assignment: assignment._id });
+    await assignment.deleteOne();
+
+    res.status(200).json({
+      message: `Assignment deleted, along with ${deletedCount} associated submission(s).`,
+    });
+  } catch (error) {
+    console.error("Delete Assignment Error:", error.message);
+    res.status(500).json({ message: "Server error deleting assignment" });
+  }
+}

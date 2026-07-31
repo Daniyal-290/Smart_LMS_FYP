@@ -19,6 +19,7 @@ const courseRoutes = require("./routes/courseRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
 const lectureRoutes = require("./routes/lectureRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const gradingRoutes = require("./routes/gradingRoutes");
 
 // Initialize Express
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/lectures", lectureRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/grading", gradingRoutes); // AI auto-grading engine (async job-based, draft/publish workflow)
 
 // ---------------------------------------------------
 // Health Check

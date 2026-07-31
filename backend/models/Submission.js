@@ -37,7 +37,9 @@ const submissionSchema = new mongoose.Schema(
     },
 
     // -------------------------------------------------
-    // AI-populated fields (filled by grading pipeline)
+    // AI-populated fields — FINAL, PUBLISHED grade/feedback.
+    // Only written by an explicit teacher "Publish" action —
+    // this is what a student can see.
     // -------------------------------------------------
 
     aiGrade: {
@@ -46,6 +48,22 @@ const submissionSchema = new mongoose.Schema(
     },
 
     aiFeedback: {
+      type: String,
+      default: "",
+    },
+
+    // -------------------------------------------------
+    // Draft AI grade/feedback — written directly by the grading
+    // engine, visible only to the teacher for review. Copied into
+    // aiGrade/aiFeedback above only when the teacher publishes it.
+    // -------------------------------------------------
+
+    pendingAiGrade: {
+      type: Number,
+      default: null,
+    },
+
+    pendingAiFeedback: {
       type: String,
       default: "",
     },

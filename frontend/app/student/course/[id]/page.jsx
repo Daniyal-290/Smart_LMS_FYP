@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
-import { Download, ArrowLeft, BookOpen, Info, Megaphone, CalendarClock, Loader2 } from "lucide-react";
+import { Download, ArrowLeft, BookOpen, Info, Megaphone, CalendarClock, Loader2, BrainCircuit } from "lucide-react";
 import { useState, useEffect } from "react";
 const API_URL = "http://localhost:5000/api";
 
@@ -187,16 +187,25 @@ export default function ViewCourse() {
                         <p className="text-xs text-slate-500">{new Date(lecture.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <a
-                      href={`http://localhost:5000${lecture.fileUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={handleDownload}
-                      className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition text-sm font-medium"
-                    >
-                      <Download size={16} />
-                      Download
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/student/quiz/${lecture._id}`)}
+                        className="flex items-center gap-2 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white px-4 py-2 rounded-xl transition text-sm font-medium shadow-sm cursor-pointer"
+                      >
+                        <BrainCircuit size={16} className="text-amber-400" />
+                        Practice Quiz
+                      </button>
+                      <a
+                        href={`http://localhost:5000${lecture.fileUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={handleDownload}
+                        className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition text-sm font-medium"
+                      >
+                        <Download size={16} />
+                        Download
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>

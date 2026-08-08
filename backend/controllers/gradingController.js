@@ -217,10 +217,65 @@ const publishAssignment = async (req, res) => {
   }
 };
 
+// ===================================================
+// PUT /api/grading/submissions/:id/override
+// ===================================================
+// Protected: Instructor (owner) / Admin
+// Manually update/override the grade and feedback for a submission.
+const overrideSubmissionGrade = async (req, res) => {
+  try {
+    const { grade, feedback } = req.body;
+
+    const submission = await Submission.findById(req.params.id);
+    if (!submission) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    const assignment = await Assignment.findById(submission.assignment);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found for this submission" });
+    }
+
+    await assertCanManageAssignment(assignment, req.user);
+
+    if (grade !== undefined && grade !== null && grade !== "") {
+      const numGrade = Number(grade);
+      if (isNaN(numGrade) || numGrade < 0 || numGrade > assignment.totalPoints) {
+        return res.status(400).json({
+          message: `Grade must be a number between 0 and ${assignment.totalPoints}`,
+        });
+      }
+      submission.pendingAiGrade = numGrade;
+      if (submission.aiGrade !== null && submission.aiGrade !== undefined) {
+        submission.aiGrade = numGrade;
+      }
+    }
+
+    if (feedback !== undefined) {
+      submission.pendingAiFeedback = feedback;
+      if (submission.aiGrade !== null && submission.aiGrade !== undefined) {
+        submission.aiFeedback = feedback;
+      }
+    }
+
+    await submission.save();
+
+    res.status(200).json({
+      message: "Grade and feedback updated successfully.",
+      submission,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    console.error("Override Submission Grade Error:", error.message || error);
+    res.status(status).json({ message: error.message || "Server error updating grade" });
+  }
+};
+
 module.exports = {
   autogradeAssignment,
   getJobStatus,
   regradeSubmission,
   publishSubmission,
   publishAssignment,
+  overrideSubmissionGrade,
 };

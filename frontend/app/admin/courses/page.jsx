@@ -147,7 +147,7 @@ export default function ManageCourses() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/admin/assign-course")}
+            onClick={() => router.push("/admin/create-course")}
             className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl hover:bg-slate-700 transition font-medium text-sm"
           >
             <Plus size={16} /> Create Course

@@ -13,6 +13,8 @@ import {
   AlertCircle,
   MessageSquareText,
   Send,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { toast } from "react-toastify";
 const API_URL = "http://localhost:5000/api";
@@ -35,6 +37,52 @@ export default function ViewSubmissions() {
   const [uploadingRubric, setUploadingRubric] = useState(false);
 
   const [feedbackSub, setFeedbackSub] = useState(null);
+  const [editGradeVal, setEditGradeVal] = useState("");
+  const [editFeedbackVal, setEditFeedbackVal] = useState("");
+  const [savingOverride, setSavingOverride] = useState(false);
+
+  const openFeedbackModal = (item, displayGrade, displayFeedback, state, totalPoints) => {
+    setEditGradeVal(displayGrade !== null && displayGrade !== undefined ? displayGrade : "");
+    setEditFeedbackVal(displayFeedback || "");
+    setFeedbackSub({
+      ...item,
+      _displayFeedback: displayFeedback,
+      _displayGrade: displayGrade,
+      _state: state,
+      _totalPoints: totalPoints,
+    });
+  };
+
+  const handleSaveOverride = async (publish = false) => {
+    if (!feedbackSub) return;
+    setSavingOverride(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/grading/submissions/${feedbackSub._id}/override`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ grade: editGradeVal, feedback: editFeedbackVal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || "Failed to update grade.");
+        return;
+      }
+
+      if (publish) {
+        await publishSubmission(feedbackSub._id);
+      } else {
+        toast.success("Grade and feedback updated!");
+        fetchSubmissions();
+      }
+      setFeedbackSub(null);
+    } catch (err) {
+      console.error("Error updating grade", err);
+      toast.error("Something went wrong updating grade.");
+    } finally {
+      setSavingOverride(false);
+    }
+  };
 
   const [jobs, setJobs] = useState({});
   const pollingRefs = useRef({});
@@ -460,17 +508,13 @@ export default function ViewSubmissions() {
                               )}
                             </td>
                             <td className="text-center">
-                              {displayFeedback ? (
-                                <button
-                                  onClick={() => setFeedbackSub({ ...item, _displayFeedback: displayFeedback, _displayGrade: displayGrade, _state: state })}
-                                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                  <MessageSquareText size={14} />
-                                  View
-                                </button>
-                              ) : (
-                                <span className="text-sm text-slate-400">—</span>
-                              )}
+                              <button
+                                onClick={() => openFeedbackModal(item, displayGrade, displayFeedback, state, group.totalPoints)}
+                                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                <Pencil size={14} />
+                                {displayFeedback || displayGrade !== null ? "View / Edit" : "Grade"}
+                              </button>
                             </td>
                             <td className="text-center">
                               <div className="flex items-center justify-center gap-2">
@@ -568,49 +612,93 @@ export default function ViewSubmissions() {
 
       {feedbackSub && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold text-slate-800">
-                {feedbackSub.student?.name || "Student"}'s Feedback
-              </h3>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  Grade & Feedback: {feedbackSub.student?.name || "Student"}
+                </h3>
+                <p className="text-xs text-slate-500">{feedbackSub.student?.enrollmentId || ""}</p>
+              </div>
               <button onClick={() => setFeedbackSub(null)} className="text-slate-400 hover:text-slate-700">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2">
               <span
                 className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   feedbackSub._state === "published"
                     ? "bg-green-100 text-green-700"
-                    : "bg-amber-100 text-amber-700"
+                    : feedbackSub._state === "pending"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-slate-100 text-slate-600"
                 }`}
               >
-                {feedbackSub._state === "published" ? "Published" : "Draft — not yet visible to student"}
-              </span>
-              <span className="text-sm text-slate-500">
-                Score: <span className="font-semibold text-slate-800">{feedbackSub._displayGrade}</span>
+                {feedbackSub._state === "published"
+                  ? "Published"
+                  : feedbackSub._state === "pending"
+                  ? "Draft — Pending Review"
+                  : "Ungraded"}
               </span>
             </div>
 
-            <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">
-              {feedbackSub._displayFeedback}
-            </p>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Score / Marks (Max: {feedbackSub._totalPoints || 100})
+              </label>
+              <input
+                type="number"
+                min="0"
+                max={feedbackSub._totalPoints || 100}
+                value={editGradeVal}
+                onChange={(e) => setEditGradeVal(e.target.value)}
+                placeholder="Enter score"
+                className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800"
+              />
+            </div>
 
-            {feedbackSub._state === "pending" && (
-              <div className="flex justify-end mt-6">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Detailed Feedback (AI / Teacher)
+              </label>
+              <textarea
+                rows={6}
+                value={editFeedbackVal}
+                onChange={(e) => setEditFeedbackVal(e.target.value)}
+                placeholder="Enter or edit student feedback..."
+                className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 resize-none leading-relaxed"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t">
+              <button
+                onClick={() => setFeedbackSub(null)}
+                className="px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={() => handleSaveOverride(false)}
+                disabled={savingOverride}
+                className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl transition text-sm font-medium disabled:opacity-50"
+              >
+                {savingOverride ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                Save Changes
+              </button>
+
+              {feedbackSub._state === "pending" && (
                 <button
-                  onClick={() => {
-                    publishSubmission(feedbackSub._id);
-                    setFeedbackSub(null);
-                  }}
-                  className="inline-flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-xl transition"
+                  onClick={() => handleSaveOverride(true)}
+                  disabled={savingOverride}
+                  className="inline-flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-xl transition text-sm font-medium disabled:opacity-50"
                 >
-                  <Send size={16} />
-                  Publish to Student
+                  {savingOverride ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  Save & Publish
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -7,6 +7,7 @@ import {
   Sparkles,
   ShieldAlert,
   BarChart3,
+  AlertTriangle,
   LogOut,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -39,6 +40,12 @@ export default function FacultySidebar() {
         { title: "Auto Grading", icon: <Sparkles size={20} />, path: "/faculty/auto-grading" },
         { title: "Plagiarism", icon: <ShieldAlert size={20} />, path: "/faculty/plagiarism" },
         { title: "Analytics", icon: <BarChart3 size={20} />, path: "/faculty/analytics" },
+      ],
+    },
+    {
+      heading: "Reports",
+      links: [
+        { title: "Mid-Term Reports", icon: <AlertTriangle size={20} />, path: "/faculty/mid-term-reports" },
       ],
     },
     {

@@ -51,6 +51,7 @@ const CLASS_OPTIONS = [
 
 export default function AssignCourse() {
   const [formData, setFormData] = useState({
+    courseDbId: "", // Store DB _id if existing
     id: "",
     name: "",
     teacher: "",
@@ -61,32 +62,75 @@ export default function AssignCourse() {
   });
 
   const [instructors, setInstructors] = useState([]);
+  const [dbCourses, setDbCourses] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchInstructors = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_URL}/auth/instructors`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error("Failed to fetch instructors");
-        const data = await res.json();
-        setInstructors(data);
-      } catch (err) {
-        console.error(err);
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const [iRes, cRes] = await Promise.all([
+        fetch(`${API_URL}/auth/instructors`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/courses/all`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (iRes.ok) {
+        const iData = await iRes.json();
+        setInstructors(iData);
       }
-    };
-    fetchInstructors();
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        setDbCourses(cData);
+      }
+    } catch (err) {
+      console.error("Failed to fetch initial data for AssignCourse", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
+
+  // Merge DB courses with static catalog (DB courses take precedence)
+  const allAvailableCourses = () => {
+    const list = [...dbCourses.map(c => ({
+      dbId: c._id,
+      id: c.courseCode || "N/A",
+      name: c.title,
+      isDb: true,
+      currentInstructor: c.instructor?.name || null,
+      credits: c.credits || 3,
+    }))];
+
+    COURSE_CATALOG.forEach(cat => {
+      const existsInDb = dbCourses.some(c => c.title.toLowerCase() === cat.name.toLowerCase() || (c.courseCode && c.courseCode.toLowerCase() === cat.id.toLowerCase()));
+      if (!existsInDb) {
+        list.push({
+          dbId: "",
+          id: cat.id,
+          name: cat.name,
+          isDb: false,
+          currentInstructor: null,
+          credits: 3,
+        });
+      }
+    });
+
+    return list;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "name") {
-      const selectedCourse = COURSE_CATALOG.find(c => c.name === value);
-      setFormData((prev) => ({ ...prev, name: value, id: selectedCourse ? selectedCourse.id : prev.id }));
+      const options = allAvailableCourses();
+      const selected = options.find(c => c.name === value);
+      setFormData((prev) => ({
+        ...prev,
+        name: value,
+        id: selected ? selected.id : prev.id,
+        courseDbId: selected ? selected.dbId : "",
+        credits: selected ? selected.credits : prev.credits,
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -100,25 +144,44 @@ export default function AssignCourse() {
     
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/courses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          title: formData.name,
-          courseCode: formData.id,
-          credits: formData.credits,
-          description: `Schedule: ${formData.schedule} | Term: ${formData.term} | Class: ${formData.classSection}`,
-          instructorId: formData.teacher
-        })
-      });
+      let res;
+
+      if (formData.courseDbId) {
+        // Existing course in DB — update instructor and description
+        res = await fetch(`${API_URL}/courses/${formData.courseDbId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            title: formData.name,
+            courseCode: formData.id,
+            credits: formData.credits,
+            description: `Schedule: ${formData.schedule} | Term: ${formData.term} | Class: ${formData.classSection}`,
+            instructorId: formData.teacher
+          })
+        });
+      } else {
+        // Create new course entry with assigned instructor
+        res = await fetch(`${API_URL}/courses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            title: formData.name,
+            courseCode: formData.id,
+            credits: formData.credits,
+            description: `Schedule: ${formData.schedule} | Term: ${formData.term} | Class: ${formData.classSection}`,
+            instructorId: formData.teacher
+          })
+        });
+      }
 
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Failed to assign course");
       }
 
-      setMessage(`Successfully assigned ${formData.name}!`);
-      setFormData({ id: "", name: "", teacher: "", schedule: "", classSection: "", term: "Spring 2026", credits: 3 });
+      setMessage(`Successfully assigned "${formData.name}"!`);
+      setFormData({ courseDbId: "", id: "", name: "", teacher: "", schedule: "", classSection: "", term: "Spring 2026", credits: 3 });
+      fetchData(); // refresh list
     } catch (err) {
       setError(err.message);
     } finally {
@@ -126,6 +189,8 @@ export default function AssignCourse() {
       setTimeout(() => setMessage(""), 3000);
     }
   };
+
+  const availableList = allAvailableCourses();
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -137,7 +202,7 @@ export default function AssignCourse() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Assign Course</h1>
-            <p className="text-slate-500 mt-2">Assign a new course to a faculty member.</p>
+            <p className="text-slate-500 mt-2">Assign a new or existing course to a faculty member.</p>
           </div>
         </div>
 
@@ -150,7 +215,11 @@ export default function AssignCourse() {
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2"><BookOpen size={16} /> Course Name</label>
               <select name="name" required value={formData.name} onChange={handleChange} className="w-full bg-slate-50 border border-slate-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition appearance-none">
                 <option value="" disabled>Select Course...</option>
-                {COURSE_CATALOG.map(course => (<option key={course.id} value={course.name}>{course.name}</option>))}
+                {availableList.map(course => (
+                  <option key={course.dbId || course.id + course.name} value={course.name}>
+                    {course.name} {course.isDb ? `(Added Course${course.currentInstructor ? ` - ${course.currentInstructor}` : ""})` : ""}
+                  </option>
+                ))}
               </select>
             </div>
 

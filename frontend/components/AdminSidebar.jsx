@@ -8,6 +8,8 @@ import {
   BookOpen,
   Users,
   List,
+  Plus,
+  Settings,
 } from "lucide-react";
 
 import { useRouter, usePathname } from "next/navigation";
@@ -33,6 +35,11 @@ export default function AdminSidebar(){
       path:"/admin/register-teacher"
     },
     {
+      title:"Create Course",
+      icon:<Plus size={20}/>,
+      path:"/admin/create-course"
+    },
+    {
       title:"Assign Course",
       icon:<BookOpen size={20}/>,
       path:"/admin/assign-course"
@@ -51,6 +58,11 @@ export default function AdminSidebar(){
       title:"Manage Courses",
       icon:<List size={20}/>,
       path:"/admin/courses"
+    },
+    {
+      title:"Exam Settings",
+      icon:<Settings size={20}/>,
+      path:"/admin/exam-settings"
     },
   ];
 

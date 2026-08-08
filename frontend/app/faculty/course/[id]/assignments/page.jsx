@@ -16,6 +16,7 @@ export default function CreateAssignment() {
   const [instructions, setInstructions] = useState("");
   const [deadline, setDeadline] = useState("");
   const [file, setFile] = useState(null);
+  const [totalPoints, setTotalPoints] = useState(100);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export default function CreateAssignment() {
     formData.append("title", title);
     formData.append("prompt", instructions);
     formData.append("dueDate", deadline);
+    formData.append("totalPoints", totalPoints);
     if (file) {
       formData.append("file", file);
     }
@@ -149,17 +151,34 @@ export default function CreateAssignment() {
             />
           </div>
 
-          {/* Deadline */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Submission Deadline
-            </label>
-            <input
-              type="datetime-local"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-400"
-            />
+          {/* Grid for Deadline and Total Marks */}
+          <div className="grid md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Submission Deadline
+              </label>
+              <input
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Total Marks / Points
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                value={totalPoints}
+                onChange={(e) => setTotalPoints(Number(e.target.value))}
+                placeholder="e.g. 100, 50, 20"
+                className="w-full border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            </div>
           </div>
 
           <button

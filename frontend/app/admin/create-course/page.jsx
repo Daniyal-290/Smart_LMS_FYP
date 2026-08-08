@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { BookOpen, Hash, GraduationCap, FileText, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BookOpen, Hash, GraduationCap, FileText, Loader2, User } from "lucide-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
@@ -14,8 +14,28 @@ export default function CreateCourse() {
     courseCode: "",
     credits: 3,
     description: "",
+    instructorId: "",
   });
+  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchInstructors = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/auth/instructors`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setInstructors(data);
+        }
+      } catch (err) {
+        console.error("Failed to load instructors", err);
+      }
+    };
+    fetchInstructors();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,8 +47,6 @@ export default function CreateCourse() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      // No instructorId sent — the backend leaves the course unassigned.
-      // An instructor can be assigned later from Manage Courses (Edit).
       const res = await fetch(`${API_URL}/courses`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -38,8 +56,8 @@ export default function CreateCourse() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create course");
 
-      toast.success(`"${formData.title}" created. Assign an instructor from Manage Courses when ready.`);
-      setFormData({ title: "", courseCode: "", credits: 3, description: "" });
+      toast.success(`Course "${formData.title}" created successfully!`);
+      setFormData({ title: "", courseCode: "", credits: 3, description: "", instructorId: "" });
       router.push("/admin/courses");
     } catch (err) {
       toast.error(err.message || "Failed to create course");
@@ -58,7 +76,7 @@ export default function CreateCourse() {
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Create Course</h1>
             <p className="text-slate-500 mt-2">
-              Add a new course without assigning an instructor yet — you can assign one later from Manage Courses.
+              Add a new course and optionally assign an instructor right away.
             </p>
           </div>
         </div>
@@ -108,6 +126,25 @@ export default function CreateCourse() {
                 className="w-full bg-slate-50 border border-slate-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <User size={16} /> Assign Instructor (Optional)
+            </label>
+            <select
+              name="instructorId"
+              value={formData.instructorId}
+              onChange={handleChange}
+              className="w-full bg-slate-50 border border-slate-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
+            >
+              <option value="">— Select Instructor (or leave unassigned) —</option>
+              {instructors.map((ins) => (
+                <option key={ins._id} value={ins._id}>
+                  {ins.name} ({ins.email})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">

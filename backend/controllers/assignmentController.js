@@ -31,7 +31,7 @@ const createAssignment = async (req, res) => {
       title,
       prompt,
       dueDate,
-      totalPoints: totalPoints || 100,
+      totalPoints: totalPoints !== undefined ? Number(totalPoints) : 100,
       rubric: { criteria: [] } // Skipping AI rubric logic
     };
 

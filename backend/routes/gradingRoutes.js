@@ -5,6 +5,7 @@ const {
   regradeSubmission,
   publishSubmission,
   publishAssignment,
+  overrideSubmissionGrade,
 } = require("../controllers/gradingController");
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
@@ -26,6 +27,8 @@ router.post(
 router.get("/jobs/:jobId", protect, authorizeRoles("Instructor", "Admin"), getJobStatus);
 
 router.post("/submissions/:id/grade", protect, authorizeRoles("Instructor", "Admin"), regradeSubmission);
+
+router.put("/submissions/:id/override", protect, authorizeRoles("Instructor", "Admin"), overrideSubmissionGrade);
 
 router.post("/submissions/:id/publish", protect, authorizeRoles("Instructor", "Admin"), publishSubmission);
 

@@ -18,10 +18,12 @@ const createSubmission = async (req, res) => {
     const { assignmentId, content } = req.body;
 
     // --- Validation ---
-    if (!assignmentId || !content) {
-      return res
-        .status(400)
-        .json({ message: "Please provide assignmentId and content" });
+    if (!assignmentId) {
+      return res.status(400).json({ message: "Please provide assignmentId" });
+    }
+
+    if (!req.file && (!content || !content.trim())) {
+      return res.status(400).json({ message: "Please provide either text content or a file attachment." });
     }
 
     // --------------------------------------------------

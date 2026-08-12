@@ -30,6 +30,8 @@ function chunk(array, size) {
   return chunks;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function formatFeedback(result) {
   const lines = result.criteriaBreakdown.map(
     (c) => `• ${c.criterion} (${c.score}/${c.maxScore}): ${c.feedback}`
@@ -103,7 +105,8 @@ async function runJob(jobId, assignmentId, rubricFile, submissionFilter) {
     const submissions = await Submission.find(submissionFilter);
     const chunks = chunk(submissions, CONCURRENCY);
 
-    for (const batch of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const batch = chunks[i];
       await Promise.all(
         batch.map(async (submission) => {
           try {
@@ -124,6 +127,11 @@ async function runJob(jobId, assignmentId, rubricFile, submissionFilter) {
       );
 
       await job.save();
+
+      // Pause 4 seconds between chunks (except after final chunk) to stay under 15 RPM free tier rate limit
+      if (i < chunks.length - 1) {
+        await sleep(4000);
+      }
     }
 
     job.status = "completed";

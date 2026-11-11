@@ -221,7 +221,7 @@ export default function ViewCourse() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => router.push(`/student/quiz/${lecture._id}`)}
+                        onClick={() => router.push(`/faculty/quiz/${lecture._id}`)}
                         className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl transition text-sm font-medium"
                       >
                         <BrainCircuit size={16} className="text-amber-400" />

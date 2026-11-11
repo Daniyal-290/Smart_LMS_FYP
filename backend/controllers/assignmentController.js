@@ -1,6 +1,7 @@
 const Assignment = require("../models/Assignment");
 const Course = require("../models/Course");
 const Submission = require("../models/Submission");
+const { runBatchPlagiarismCheck } = require("../services/plagiarismService");
 
 // ===================================================
 // POST /api/assignments
@@ -110,12 +111,44 @@ const getCourseAssignments = async (req, res) => {
     }
   };
 
+// ===================================================
+// POST /api/assignments/:assignmentId/check-plagiarism
+// ===================================================
+// Protected: Instructor (owner) / Admin
+// Runs internal batch plagiarism detection across all submissions for an assignment.
+const checkPlagiarism = async (req, res) => {
+  try {
+    const assignmentId = req.params.assignmentId || req.params.id;
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    const course = await Course.findById(assignment.course);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found for this assignment" });
+    }
+
+    if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Not authorized to check plagiarism for this course" });
+    }
+
+    const result = await runBatchPlagiarismCheck(assignmentId);
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Check Plagiarism Error:", error.message);
+    res.status(500).json({ message: error.message || "Server error running plagiarism check" });
+  }
+};
+
 module.exports = {
   createAssignment,
   getAssignments,
   getCourseAssignments,
   updateAssignment,
   deleteAssignment,
+  checkPlagiarism,
 };
 
 // ===================================================

@@ -15,6 +15,16 @@ const assignmentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    prompt: {
+      type: String,
+      default: "",
+    },
+
+    description: {
+      type: String,
+      default: "",
+    },
+
     course: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",

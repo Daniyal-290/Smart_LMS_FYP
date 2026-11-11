@@ -1,4 +1,4 @@
-const { ai, GEMINI_MODEL } = require("./geminiClient");
+const { generateWithRetry, extractJson } = require("./geminiClient");
 const { fileToGeminiParts } = require("./fileContentService");
 
 // ===================================================
@@ -12,23 +12,6 @@ const { fileToGeminiParts } = require("./fileContentService");
 // Returns the raw grading result — it does NOT write to the database.
 // Callers decide where the result goes (pendingAiGrade for a fresh
 // grade/regrade, or copied to aiGrade on publish).
-
-function extractJson(rawText) {
-  const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-  const start = cleaned.indexOf("{");
-  if (start === -1) throw new Error("No JSON object found in Gemini's response.");
-
-  let depth = 0;
-  for (let i = start; i < cleaned.length; i++) {
-    if (cleaned[i] === "{") depth++;
-    if (cleaned[i] === "}") depth--;
-    if (depth === 0) {
-      return JSON.parse(cleaned.slice(start, i + 1));
-    }
-  }
-  throw new Error("Unterminated JSON object in Gemini's response.");
-}
 
 function buildRubricText(assignment) {
   const criteria = assignment.rubric?.criteria || [];
@@ -115,8 +98,7 @@ Respond with ONLY a JSON object in this EXACT shape, no markdown or commentary:
   };
 
   const callGemini = () =>
-    ai.models.generateContent({
-      model: GEMINI_MODEL,
+    generateWithRetry({
       contents: [{ role: "user", parts: [{ text: instruction }, ...parts] }],
       config: { responseMimeType: "application/json", responseSchema },
     });

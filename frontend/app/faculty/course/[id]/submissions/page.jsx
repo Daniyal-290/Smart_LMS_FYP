@@ -15,8 +15,11 @@ import {
   Send,
   Pencil,
   Check,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import PlagiarismBadge from "@/components/PlagiarismBadge";
+import PlagiarismModal from "@/components/PlagiarismModal";
 const API_URL = "http://localhost:5000/api";
 
 export default function ViewSubmissions() {
@@ -40,6 +43,39 @@ export default function ViewSubmissions() {
   const [editGradeVal, setEditGradeVal] = useState("");
   const [editFeedbackVal, setEditFeedbackVal] = useState("");
   const [savingOverride, setSavingOverride] = useState(false);
+
+  // Plagiarism state
+  const [activePlagiarismSub, setActivePlagiarismSub] = useState(null);
+  const [checkingPlagiarismIds, setCheckingPlagiarismIds] = useState({});
+
+  const handleCheckPlagiarism = async (assignmentId) => {
+    setCheckingPlagiarismIds((prev) => ({ ...prev, [assignmentId]: true }));
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/assignments/${assignmentId}/check-plagiarism`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || "Failed to run plagiarism check.");
+        return;
+      }
+      toast.success(
+        data.message ||
+          `Plagiarism check completed! Flagged ${data.flaggedCount} submission(s).`
+      );
+      fetchSubmissions();
+    } catch (err) {
+      console.error("Error running plagiarism check", err);
+      toast.error("Something went wrong running plagiarism check.");
+    } finally {
+      setCheckingPlagiarismIds((prev) => ({ ...prev, [assignmentId]: false }));
+    }
+  };
 
   const openFeedbackModal = (item, displayGrade, displayFeedback, state, totalPoints) => {
     setEditGradeVal(displayGrade !== null && displayGrade !== undefined ? displayGrade : "");
@@ -411,6 +447,21 @@ export default function ViewSubmissions() {
                         )}
                         {isJobRunning ? "Grading..." : "Autograde Assignment"}
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCheckPlagiarism(group.assignmentId)}
+                        disabled={checkingPlagiarismIds[group.assignmentId]}
+                        className="plag-check-btn"
+                        title="Scan all submissions in this cohort for peer plagiarism and paraphrasing"
+                      >
+                        {checkingPlagiarismIds[group.assignmentId] ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <ShieldAlert size={16} />
+                        )}
+                        {checkingPlagiarismIds[group.assignmentId] ? "Scanning..." : "Check Plagiarism"}
+                      </button>
                     </div>
                   </div>
 
@@ -445,6 +496,7 @@ export default function ViewSubmissions() {
                         <th className="px-6 py-3 text-left">Student</th>
                         <th className="px-6 py-3">Marks</th>
                         <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Plagiarism</th>
                         <th className="px-6 py-3">File</th>
                         <th className="px-6 py-3">Feedback</th>
                         <th className="px-6 py-3">Action</th>
@@ -492,6 +544,12 @@ export default function ViewSubmissions() {
                               >
                                 {state === "published" ? "Published" : state === "pending" ? "Pending Review" : "Ungraded"}
                               </span>
+                            </td>
+                            <td className="text-center">
+                              <PlagiarismBadge
+                                submission={item}
+                                onClick={() => setActivePlagiarismSub(item)}
+                              />
                             </td>
                             <td className="text-center">
                               {item.fileUrl ? (
@@ -701,6 +759,12 @@ export default function ViewSubmissions() {
             </div>
           </div>
         </div>
+      )}
+      {activePlagiarismSub && (
+        <PlagiarismModal
+          submission={activePlagiarismSub}
+          onClose={() => setActivePlagiarismSub(null)}
+        />
       )}
     </div>
   );

@@ -35,6 +35,12 @@ app.use(cors());                  // Enable CORS for frontend
 app.use(express.json());          // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", (req, res) => {
+  res.status(404).json({
+    message:
+      "Uploaded file not found on this server. If this record was created on another machine, please re-upload the file.",
+  });
+});
 
 // ---------------------------------------------------
 // API Routes
@@ -72,6 +78,13 @@ app.use((req, res) => {
 // Global Error Handler
 // ---------------------------------------------------
 app.use((err, req, res, next) => {
+  if (err && err.name === "MulterError") {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "File is too large. Maximum allowed size is 50MB."
+        : err.message;
+    return res.status(400).json({ message });
+  }
   console.error("Unhandled error:", err.stack);
   res.status(500).json({ message: "Internal server error" });
 });

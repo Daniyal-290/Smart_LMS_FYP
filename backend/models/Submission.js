@@ -68,6 +68,15 @@ const submissionSchema = new mongoose.Schema(
       default: "",
     },
 
+    // -------------------------------------------------
+    // Internal Plagiarism Detection fields
+    // -------------------------------------------------
+
+    cleanedAnswerText: {
+      type: String,
+      default: "", // Student's submission with assignment questions, headers & boilerplate removed
+    },
+
     embedding: {
       type: [Number], // Vector embedding for similarity/plagiarism checks
       default: [],
@@ -81,6 +90,49 @@ const submissionSchema = new mongoose.Schema(
     similarityScore: {
       type: Number,
       default: 0,
+    },
+
+    plagiarismReport: {
+      isFlagged: {
+        type: Boolean,
+        default: false,
+      },
+      highestSimilarityScore: {
+        type: Number,
+        default: 0, // 0 to 100 percentage
+      },
+      checkedAt: {
+        type: Date,
+      },
+      matchedSubmissions: [
+        {
+          matchedStudentId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+          matchedSubmissionId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Submission",
+          },
+          cosineSimilarity: {
+            type: Number,
+            default: 0,
+          },
+          aiVerifiedScore: {
+            type: Number,
+            default: 0,
+          },
+          reasoning: {
+            type: String,
+            default: "",
+          },
+          flaggedType: {
+            type: String,
+            enum: ["Direct Copy", "Paraphrased", "Identical Math Errors/Steps", "Safe"],
+            default: "Safe",
+          },
+        },
+      ],
     },
   },
   { timestamps: true }

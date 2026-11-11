@@ -1,4 +1,4 @@
-const { ai, GEMINI_MODEL } = require("./geminiClient");
+const { generateWithRetry, extractJson } = require("./geminiClient");
 const { fileToGeminiParts } = require("./fileContentService");
 
 // ===================================================
@@ -9,23 +9,6 @@ const { fileToGeminiParts } = require("./fileContentService");
 // structured criteria list we can store on the Assignment and
 // reuse for every submission we grade — so we only ever parse
 // the rubric file once, not on every grading run.
-
-function extractJson(rawText) {
-  const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-  const start = cleaned.indexOf("{");
-  if (start === -1) throw new Error("No JSON object found in Gemini's response.");
-
-  let depth = 0;
-  for (let i = start; i < cleaned.length; i++) {
-    if (cleaned[i] === "{") depth++;
-    if (cleaned[i] === "}") depth--;
-    if (depth === 0) {
-      return JSON.parse(cleaned.slice(start, i + 1));
-    }
-  }
-  throw new Error("Unterminated JSON object in Gemini's response.");
-}
 
 /**
  * @param {string} fileUrl - stored path, e.g. "/uploads/xyz.docx"
@@ -74,8 +57,7 @@ Rules:
   };
 
   const callGemini = () =>
-    ai.models.generateContent({
-      model: GEMINI_MODEL,
+    generateWithRetry({
       contents: [{ role: "user", parts: [{ text: instruction }, ...fileParts] }],
       config: { responseMimeType: "application/json", responseSchema },
     });

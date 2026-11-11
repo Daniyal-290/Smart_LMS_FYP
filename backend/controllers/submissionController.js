@@ -1,5 +1,6 @@
 const Submission = require("../models/Submission");
 const Assignment = require("../models/Assignment");
+const { checkSingleSubmissionPlagiarism } = require("../services/plagiarismService");
 
 // ===================================================
 // POST /api/submissions
@@ -88,21 +89,18 @@ const createSubmission = async (req, res) => {
     // ==================================================
 
     // --------------------------------------------------
-    // Step 2 — Simulate AI grading (MOCK — replace later)
+    // Step 2 — Asynchronously Run Internal Plagiarism Pipeline
     // --------------------------------------------------
-    submission.aiGrade = null; // Disabled mock grading
-    submission.aiFeedback = ""; // Disabled mock feedback
-    submission.isFlagged = false;
-    submission.similarityScore = 0;
-    submission.embedding = []; // Placeholder — will be a real vector
-
-    await submission.save();
+    // Performs question stripping, vector embedding, and peer similarity check.
+    checkSingleSubmissionPlagiarism(submission._id, assignmentId).catch((err) => {
+      console.warn("Background plagiarism check error:", err.message);
+    });
 
     // --------------------------------------------------
     // Step 3 — Return the completed submission
     // --------------------------------------------------
     res.status(201).json({
-      message: "Submission created and graded successfully",
+      message: "Submission created and received successfully",
       submission,
     });
   } catch (error) {
@@ -151,7 +149,9 @@ const getCourseSubmissions = async (req, res) => {
     // Then find submissions for these assignments
     const submissions = await Submission.find({ assignment: { $in: assignmentIds } })
       .populate("student", "name email enrollmentId")
-      .populate("assignment", "title totalPoints");
+      .populate("assignment", "title totalPoints prompt description")
+      .populate("plagiarismReport.matchedSubmissions.matchedStudentId", "name email enrollmentId")
+      .populate("plagiarismReport.matchedSubmissions.matchedSubmissionId", "cleanedAnswerText content originalFileName");
 
     res.status(200).json(submissions);
   } catch (error) {

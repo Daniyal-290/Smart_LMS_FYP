@@ -185,7 +185,7 @@ async function generateSubmissionEmbedding(cleanedText) {
 // ===================================================
 // Step 3: Hybrid Verification & Math Logic
 // ===================================================
-// When cosineSimilarity >= 0.70, run secondary AI verification check.
+// When cosineSimilarity >= 0.50, run secondary AI verification check.
 async function verifyPlagiarismWithAI(textA, textB, assignment, cosineVal) {
   const cosinePercent = Math.round(cosineVal * 100);
 
@@ -207,23 +207,29 @@ ${textB.slice(0, 4000)}
 
 Cosine Vector Similarity: ${cosinePercent}%
 
-ANALYSIS GUIDELINES:
-1. Standard / Theoretical Questions:
-   - Analyze whether Submission A and B share paraphrased sentence structures, identical argument ordering, unusual vocabulary choices, or copied phrasing, versus just independently stating the same correct textbook facts.
-   - Two students correctly defining standard concepts using standard definitions is NOT plagiarism unless the specific sentence structuring and idiosyncratic examples are shared.
+CRITICAL INTEGRITY AND SIMILARITY EVALUATION RULES:
+1. HIGH SIMILARITY (>= 75%):
+   - A vector cosine similarity of 75% or higher indicates overwhelming lexical, semantic, and structural overlap.
+   - You MUST NOT classify submissions with >= 75% cosine similarity as "Safe". Independent students writing their own answers do not reach 75%+ cosine similarity unless the answer is just a single trivial phrase.
+   - If students share similar sentence flow, similar conceptual explanations, or similar illustrative examples (even for standard textbook topics such as database normalization, data structures, or networking), you MUST classify as "Paraphrased" or "Direct Copy".
+   - Under no circumstances should a pair with >= 75% similarity be marked "Safe".
 
-2. Math / Formula / Calculation-Heavy Questions:
-   - Because correct mathematical solutions naturally follow identical formulas and standard steps, DO NOT flag standard, correct mathematical steps as plagiarism.
-   - ONLY flag high similarity if both students share:
-     a) The exact same calculation mistakes, arithmetic errors, sign errors, or wrong final answers.
-     b) The exact same unusual or unorthodox skipped intermediate steps.
-     c) Identical word-for-word explanatory sentences surrounding the math formulas.
+2. VERY HIGH SIMILARITY (>= 85%):
+   - At >= 85% similarity, identical phrasing, structure, or verbatim copy-pasting/paraphrasing is virtually certain.
+   - Classify as "Direct Copy" (or "Paraphrased" if systematically rewritten sentence-by-sentence) and calibrate the aiVerifiedScore to be at least ${cosinePercent}%.
 
-3. Classification Categories:
+3. MODERATE SIMILARITY (50% - 74%):
+   - Normal overlap of standard definitions and terminology typically produces 50% - 74% similarity.
+   - Classify as "Paraphrased" if there is clear structural copying or shared unique examples, or "Safe" if it is merely independent answers covering standard textbook points.
+
+4. MATH / FORMULA QUESTIONS:
+   - For purely computational steps, flag as "Identical Math Errors/Steps" if both students share matching arithmetic mistakes, identical wrong final answers, or idiosyncratic skipped steps.
+
+5. Classification Categories:
    - "Direct Copy": Substantial word-for-word duplication or identical code/steps with trivial alterations.
    - "Paraphrased": Rewritten sentences retaining identical structural cadence, concept ordering, and unique analogies/arguments.
    - "Identical Math Errors/Steps": Matching numerical errors, wrong final values, or identical skipped derivation steps.
-   - "Safe": Independent work, incidental similarity due to standard facts, common formulas, or coincidence.
+   - "Safe": Independent work, incidental similarity due to standard facts, common formulas, or coincidence (ONLY applicable when similarity is below 75%).
 
 Respond with ONLY a JSON object in this EXACT shape:
 {
@@ -252,14 +258,37 @@ Respond with ONLY a JSON object in this EXACT shape:
     });
 
     const parsed = extractJson(response.text);
+    let finalScore = Math.max(0, Math.min(100, Math.round(parsed.aiVerifiedScore || 0)));
+    let finalType = parsed.flaggedType || "Safe";
+    let reasoning = parsed.reasoning || "Similarity evaluated.";
+
+    // Guardrail against AI leniency at high vector similarities:
+    if (cosinePercent >= 75) {
+      // Ensure score is at least the measured cosine similarity
+      finalScore = Math.max(cosinePercent, finalScore);
+
+      // Overwhelming vector similarity cannot be classified as "Safe"
+      if (finalType === "Safe") {
+        if (cosinePercent >= 85) {
+          finalType = "Direct Copy";
+          reasoning = `High vector similarity (${cosinePercent}%); extensive overlap in phrasing, structure, and illustrative examples detected.`;
+        } else {
+          finalType = "Paraphrased";
+          reasoning = `Substantial similarity (${cosinePercent}%); shared explanatory structure and concept flow detected.`;
+        }
+      }
+    } else if (cosinePercent >= 50) {
+      finalScore = Math.max(cosinePercent, finalScore);
+    }
+
     return {
-      aiVerifiedScore: Math.max(0, Math.min(100, Math.round(parsed.aiVerifiedScore || 0))),
-      flaggedType: parsed.flaggedType || "Safe",
-      reasoning: parsed.reasoning || "Similarity evaluated.",
+      aiVerifiedScore: finalScore,
+      flaggedType: finalType,
+      reasoning: reasoning,
     };
   } catch (err) {
     console.warn("AI verification error, falling back to cosine baseline:", err.message);
-    const fallbackType = cosinePercent >= 75 ? "Paraphrased" : "Safe";
+    const fallbackType = cosinePercent >= 85 ? "Direct Copy" : cosinePercent >= 75 ? "Paraphrased" : "Safe";
     return {
       aiVerifiedScore: cosinePercent,
       flaggedType: fallbackType,
@@ -307,7 +336,7 @@ async function compareSubmissionPair(subA, subB, assignment) {
   const cosine = cosineSimilarity(subA.embedding, subB.embedding);
   const cosinePercent = Math.round(cosine * 100);
 
-  if (cosine >= 0.70) {
+  if (cosine >= 0.50) {
     const aiResult = await verifyPlagiarismWithAI(
       subA.cleanedAnswerText || "",
       subB.cleanedAnswerText || "",
@@ -317,7 +346,7 @@ async function compareSubmissionPair(subA, subB, assignment) {
 
     return {
       cosineSimilarity: cosine,
-      aiVerifiedScore: aiResult.aiVerifiedScore,
+      aiVerifiedScore: Math.max(cosinePercent, aiResult.aiVerifiedScore),
       reasoning: aiResult.reasoning,
       flaggedType: aiResult.flaggedType,
     };
@@ -397,7 +426,8 @@ async function checkSingleSubmissionPlagiarism(submissionId, assignmentId) {
     });
 
     const peerHighest = peerMatches.reduce(
-      (max, m) => Math.max(max, m.aiVerifiedScore || Math.round(m.cosineSimilarity * 100)),
+      (max, m) =>
+        Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
       0
     );
 
@@ -413,7 +443,8 @@ async function checkSingleSubmissionPlagiarism(submissionId, assignmentId) {
   }
 
   const highestScore = currentMatches.reduce(
-    (max, m) => Math.max(max, m.aiVerifiedScore || Math.round(m.cosineSimilarity * 100)),
+    (max, m) =>
+      Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
     0
   );
 
@@ -503,7 +534,8 @@ async function runBatchPlagiarismCheck(assignmentId) {
   for (const sub of submissions) {
     const matches = matchMap.get(sub._id.toString()) || [];
     const highest = matches.reduce(
-      (max, m) => Math.max(max, m.aiVerifiedScore || Math.round(m.cosineSimilarity * 100)),
+      (max, m) =>
+        Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
       0
     );
     const isFlagged = highest >= 75;

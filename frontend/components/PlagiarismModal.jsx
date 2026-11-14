@@ -9,6 +9,7 @@ import {
   Scale,
   FileText,
   AlertTriangle,
+  AlertCircle,
   Info,
 } from "lucide-react";
 import "./PlagiarismModal.css";
@@ -26,28 +27,49 @@ export default function PlagiarismModal({ submission, onClose }) {
   if (!submission) return null;
 
   const currentMatch = matches[selectedMatchIdx] || null;
-  const isFlagged = report.isFlagged || report.highestSimilarityScore >= 75;
+  const highestScore = Math.round(
+    report.highestSimilarityScore ?? submission.similarityScore ?? 0
+  );
+  const isFlagged = report.isFlagged || highestScore >= 75;
+  const isModerate = !isFlagged && highestScore >= 50;
 
-  const getTagClass = (type) => {
-    switch (type) {
-      case "Direct Copy":
-        return "plag-tag-pill plag-tag-direct";
-      case "Paraphrased":
-        return "plag-tag-pill plag-tag-paraphrased";
-      case "Identical Math Errors/Steps":
-        return "plag-tag-pill plag-tag-math";
-      default:
-        return "plag-tag-pill plag-tag-safe";
+  const currentMatchScore = Math.round(
+    Math.max(
+      currentMatch?.aiVerifiedScore || 0,
+      (currentMatch?.cosineSimilarity || 0) * 100
+    )
+  );
+
+  const getTagClass = (type, score) => {
+    if (score >= 75) {
+      return "plag-tag-pill plag-tag-direct";
     }
+    if (score >= 50) {
+      if (type === "Paraphrased") return "plag-tag-pill plag-tag-paraphrased";
+      return "plag-tag-pill plag-tag-moderate";
+    }
+    if (type === "Identical Math Errors/Steps") return "plag-tag-pill plag-tag-math";
+    return "plag-tag-pill plag-tag-safe";
+  };
+
+  const getDisplayTag = (match) => {
+    if (!match) return "Safe";
+    const score = Math.round(
+      Math.max(match.aiVerifiedScore || 0, (match.cosineSimilarity || 0) * 100)
+    );
+    let type = match.flaggedType || "Safe";
+    if (score >= 75 && type === "Safe") {
+      type = "Plagiarism Detected";
+    } else if (score >= 50 && type === "Safe") {
+      type = "Moderate Similarity";
+    }
+    return `${type} (${score}%)`;
   };
 
   const matchedStudentName =
     currentMatch?.matchedStudentId?.name || "Classmate";
   const matchedStudentId =
     currentMatch?.matchedStudentId?.enrollmentId || "";
-  const matchScore =
-    currentMatch?.aiVerifiedScore ??
-    Math.round((currentMatch?.cosineSimilarity || 0) * 100);
 
   const studentCleanedText =
     submission.cleanedAnswerText ||
@@ -59,6 +81,13 @@ export default function PlagiarismModal({ submission, onClose }) {
     currentMatch?.matchedSubmissionId?.content ||
     "(Classmate answer text not available)";
 
+  const reasoningClass =
+    currentMatchScore >= 75
+      ? "plag-reasoning-box alert"
+      : currentMatchScore >= 50
+      ? "plag-reasoning-box moderate"
+      : "plag-reasoning-box";
+
   return (
     <div className="plag-modal-overlay" onClick={onClose}>
       <div className="plag-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -68,6 +97,8 @@ export default function PlagiarismModal({ submission, onClose }) {
             <h2 className="plag-modal-title">
               {isFlagged ? (
                 <ShieldAlert size={24} color="#ef4444" />
+              ) : isModerate ? (
+                <AlertCircle size={24} color="#f59e0b" />
               ) : (
                 <ShieldCheck size={24} color="#10b981" />
               )}
@@ -87,21 +118,29 @@ export default function PlagiarismModal({ submission, onClose }) {
           {/* Summary Row */}
           <div className="plag-summary-card">
             <div className="plag-summary-item">
-              <span className="plag-summary-label">Result</span>
+              <span className="plag-summary-label">Highest Similarity</span>
               <span
                 className="plag-summary-val"
                 style={{
-                  color: isFlagged ? "#dc2626" : "#059669",
+                  color: isFlagged ? "#dc2626" : isModerate ? "#b45309" : "#059669",
                 }}
               >
-                {isFlagged ? "Plagiarised" : "Original"}
+                {isFlagged
+                  ? `Plagiarism Detected (${highestScore}%)`
+                  : isModerate
+                  ? `Moderate Similarity (${highestScore}%)`
+                  : `Original (${highestScore}%)`}
               </span>
             </div>
 
             <div className="plag-summary-item">
               <span className="plag-summary-label">Status</span>
               <span className="plag-summary-val">
-                {isFlagged ? "⚠️ Plagiarised (Above 75% threshold)" : "✅ Original"}
+                {isFlagged
+                  ? "🔴 Plagiarism Detected (≥ 75%)"
+                  : isModerate
+                  ? "🟡 Moderate Similarity (50% - 74%)"
+                  : "🟢 Original (< 50%)"}
               </span>
             </div>
 
@@ -131,7 +170,16 @@ export default function PlagiarismModal({ submission, onClose }) {
               <div className="plag-peer-selector">
                 {matches.map((m, idx) => {
                   const sName = m.matchedStudentId?.name || `Classmate ${idx + 1}`;
-                  const isPeerPlagiarised = (m.aiVerifiedScore ?? Math.round((m.cosineSimilarity || 0) * 100)) >= 75;
+                  const pScore = Math.round(
+                    Math.max(m.aiVerifiedScore || 0, (m.cosineSimilarity || 0) * 100)
+                  );
+                  let tierText = `Original (${pScore}%)`;
+                  if (pScore >= 75) {
+                    tierText = `Plagiarised (${pScore}%)`;
+                  } else if (pScore >= 50) {
+                    tierText = `Moderate (${pScore}%)`;
+                  }
+
                   return (
                     <button
                       key={idx}
@@ -140,7 +188,7 @@ export default function PlagiarismModal({ submission, onClose }) {
                       onClick={() => setSelectedMatchIdx(idx)}
                     >
                       <User size={14} />
-                      {sName} · {isPeerPlagiarised ? "Plagiarised" : "Original"}
+                      {sName} · {tierText}
                     </button>
                   );
                 })}
@@ -152,14 +200,20 @@ export default function PlagiarismModal({ submission, onClose }) {
           {currentMatch ? (
             <>
               {/* Reasoning & Type Banner */}
-              <div className={`plag-reasoning-box ${matchScore >= 75 ? "alert" : ""}`}>
+              <div className={reasoningClass}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                   <div className="plag-reasoning-title">
-                    {matchScore >= 75 ? <AlertTriangle size={16} color="#ef4444" /> : <Info size={16} color="#3b82f6" />}
+                    {currentMatchScore >= 75 ? (
+                      <AlertTriangle size={16} color="#ef4444" />
+                    ) : currentMatchScore >= 50 ? (
+                      <AlertCircle size={16} color="#f59e0b" />
+                    ) : (
+                      <Info size={16} color="#3b82f6" />
+                    )}
                     Comparison with {matchedStudentName} ({matchedStudentId || "ID unavailable"})
                   </div>
-                  <span className={getTagClass(currentMatch.flaggedType)}>
-                    {currentMatch.flaggedType || (matchScore >= 75 ? "Plagiarised" : "Original")}
+                  <span className={getTagClass(currentMatch.flaggedType, currentMatchScore)}>
+                    {getDisplayTag(currentMatch)}
                   </span>
                 </div>
                 <p className="plag-reasoning-text">

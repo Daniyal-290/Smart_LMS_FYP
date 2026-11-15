@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ShieldAlert,
   AlertTriangle,
@@ -10,118 +10,259 @@ import {
   Users,
   FileWarning,
   Loader2,
+  RefreshCw,
+  BookOpen,
 } from "lucide-react";
+import { toast } from "react-toastify";
+import PlagiarismModal from "@/components/PlagiarismModal";
 
-
-/* ──────────────────────────────────────────────
-   MOCK DATA — swap these out for fetch() later
-   ────────────────────────────────────────────── */
-
-const mockAllSimilarityFlags = [
-  { id: 1, studentName: "Ahmed Raza",       enrollmentId: "SP26-BCS-015", assignment: "Database ER Diagram",        course: "CS-301", similarityPercentage: 87, status: "Unreviewed" },
-  { id: 2, studentName: "Sara Khan",        enrollmentId: "SP26-BCS-028", assignment: "UML Class Diagram",          course: "CS-304", similarityPercentage: 72, status: "Unreviewed" },
-  { id: 3, studentName: "Usman Ali",        enrollmentId: "SP26-BCS-033", assignment: "SQL Query Optimization",     course: "CS-301", similarityPercentage: 65, status: "Reviewed"   },
-  { id: 4, studentName: "Fatima Noor",      enrollmentId: "SP26-BSE-012", assignment: "TCP/IP Analysis Report",     course: "CS-307", similarityPercentage: 58, status: "Cleared"    },
-  { id: 5, studentName: "Hassan Tariq",     enrollmentId: "SP26-BCS-045", assignment: "Neural Network Lab",         course: "CS-401", similarityPercentage: 91, status: "Unreviewed" },
-  { id: 6, studentName: "Ayesha Siddiqui",  enrollmentId: "SP26-BCS-019", assignment: "Agile Methodology Report",   course: "CS-304", similarityPercentage: 78, status: "Reviewed"   },
-  { id: 7, studentName: "Imran Sheikh",     enrollmentId: "SP26-BSE-025", assignment: "Network Security Analysis",  course: "CS-307", similarityPercentage: 62, status: "Unreviewed" },
-  { id: 8, studentName: "Nadia Qureshi",    enrollmentId: "SP26-BCS-051", assignment: "Decision Tree Implementation", course: "CS-401", similarityPercentage: 55, status: "Cleared"  },
-];
-
-
+const API_URL = "http://localhost:5000/api";
 
 export default function Plagiarism() {
-
+  const [flags, setFlags] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [stats, setStats] = useState({
+    totalChecked: 0,
+    totalFlags: 0,
+    unreviewed: 0,
+    highRisk: 0,
+    avgSimilarity: "0.0",
+  });
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [loadingIds, setLoadingIds] = useState({});
+  const [selectedCourse, setSelectedCourse] = useState("All");
+  const [selectedSub, setSelectedSub] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
-  const handleReview = (id) => {
-    setLoadingIds(prev => ({ ...prev, [id]: true }));
-    setTimeout(() => {
-      import("react-toastify").then(({ toast }) => {
-        toast.info("Detailed plagiarism review is coming soon.");
+  const fetchPlagiarismData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/submissions/instructor/plagiarism-flags`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setLoadingIds(prev => ({ ...prev, [id]: false }));
-    }, 500);
+      if (res.ok) {
+        const data = await res.json();
+        setFlags(data.flags || []);
+        setStats(
+          data.stats || {
+            totalChecked: 0,
+            totalFlags: 0,
+            unreviewed: 0,
+            highRisk: 0,
+            avgSimilarity: "0.0",
+          }
+        );
+        setCourses(data.courses || []);
+      } else {
+        toast.error("Failed to load plagiarism records.");
+      }
+    } catch (err) {
+      console.error("Plagiarism load error:", err);
+      toast.error("Network error loading plagiarism records.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPlagiarismData();
+  }, [fetchPlagiarismData]);
+
+  const handleUpdateStatus = async (subId, newStatus) => {
+    setUpdatingStatusId(subId);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/submissions/${subId}/plagiarism-status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        toast.success(`Marked as ${newStatus}`);
+        setFlags((prev) =>
+          prev.map((f) => (f._id === subId ? { ...f, status: newStatus } : f))
+        );
+        setStats((prev) => {
+          const currentFlag = flags.find((f) => f._id === subId);
+          const wasUnreviewed =
+            (currentFlag?.status === "Unreviewed" || !currentFlag?.status) &&
+            (currentFlag?.similarityScore || 0) >= 50;
+          const isNowUnreviewed =
+            newStatus === "Unreviewed" && (currentFlag?.similarityScore || 0) >= 50;
+          const diff = (isNowUnreviewed ? 1 : 0) - (wasUnreviewed ? 1 : 0);
+          return {
+            ...prev,
+            unreviewed: Math.max(0, (prev.unreviewed || 0) + diff),
+          };
+        });
+      } else {
+        toast.error("Failed to update status");
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
+      toast.error("Error updating status");
+    } finally {
+      setUpdatingStatusId(null);
+    }
   };
 
-  const filtered = mockAllSimilarityFlags.filter((f) => {
-    const matchSearch =
-      f.studentName.toLowerCase().includes(search.toLowerCase()) ||
-      f.assignment.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "All" || f.status === filterStatus;
-    return matchSearch && matchStatus;
+  const handleReview = (flag) => {
+    setSelectedSub(flag);
+    if (flag.status === "Unreviewed" && flag.similarityScore >= 50) {
+      handleUpdateStatus(flag._id, "Reviewed");
+    }
+  };
+
+  const filtered = flags.filter((f) => {
+    const sName = f.student?.name || "Unknown Student";
+    const sId = f.student?.enrollmentId || "";
+    const aTitle = f.assignment?.title || "Assignment";
+    const cTitle = f.courseTitle || "";
+    const cCode = f.courseCode || "";
+
+    const matchesSearch =
+      sName.toLowerCase().includes(search.toLowerCase()) ||
+      sId.toLowerCase().includes(search.toLowerCase()) ||
+      aTitle.toLowerCase().includes(search.toLowerCase()) ||
+      cTitle.toLowerCase().includes(search.toLowerCase()) ||
+      cCode.toLowerCase().includes(search.toLowerCase());
+
+    const matchesCourse =
+      selectedCourse === "All" ||
+      f.assignment?.course?._id === selectedCourse ||
+      f.assignment?.course === selectedCourse;
+
+    let matchesFilter = true;
+    if (filterStatus === "Unreviewed") matchesFilter = f.status === "Unreviewed";
+    else if (filterStatus === "Reviewed") matchesFilter = f.status === "Reviewed";
+    else if (filterStatus === "Cleared") matchesFilter = f.status === "Cleared";
+    else if (filterStatus === "High Risk") matchesFilter = f.similarityScore >= 75;
+    else if (filterStatus === "Moderate")
+      matchesFilter = f.similarityScore >= 50 && f.similarityScore < 75;
+    else if (filterStatus === "Original") matchesFilter = f.similarityScore < 50;
+
+    return matchesSearch && matchesCourse && matchesFilter;
   });
 
-  const totalFlags    = mockAllSimilarityFlags.length;
-  const unreviewed    = mockAllSimilarityFlags.filter((f) => f.status === "Unreviewed").length;
-  const highRisk      = mockAllSimilarityFlags.filter((f) => f.similarityPercentage >= 70).length;
-  const avgSimilarity = (mockAllSimilarityFlags.reduce((s, f) => s + f.similarityPercentage, 0) / totalFlags).toFixed(1);
-
-  const statusColor = {
-    Unreviewed: "bg-amber-100 text-amber-700",
-    Reviewed:   "bg-slate-100 text-slate-700",
-    Cleared:    "bg-emerald-100 text-emerald-700",
-  };
-
-
   return (
-
     <div className="space-y-8">
-
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800">Plagiarism Detection</h1>
-        <p className="text-slate-500 mt-2">Review semantic similarity flags across all assignments</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">Plagiarism Detection</h1>
+          <p className="text-slate-500 mt-2">
+            Review semantic similarity flags across all assignments
+          </p>
+        </div>
+        <button
+          onClick={fetchPlagiarismData}
+          disabled={loading}
+          className="inline-flex items-center gap-2 self-start sm:self-auto bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 shadow-sm transition disabled:opacity-50 cursor-pointer"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin text-slate-400" : "text-slate-600"} />
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
-
-      {/* Stats */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard icon={<ShieldAlert size={22} />}   title="Total Flags"       value={totalFlags}             accent="bg-slate-100 text-slate-700" />
-        <StatCard icon={<AlertTriangle size={22} />} title="Unreviewed"        value={unreviewed}             accent="bg-amber-50 text-amber-600" />
-        <StatCard icon={<FileWarning size={22} />}   title="High Risk (≥70%)"  value={highRisk}               accent="bg-red-50 text-red-600" />
-        <StatCard icon={<Users size={22} />}         title="Avg Similarity"    value={`${avgSimilarity}%`}    accent="bg-slate-100 text-slate-700" />
+        <StatCard
+          icon={<ShieldAlert size={22} />}
+          title="Total Flags"
+          value={stats.totalFlags}
+          accent="bg-slate-100 text-slate-700"
+        />
+        <StatCard
+          icon={<AlertTriangle size={22} />}
+          title="Unreviewed"
+          value={stats.unreviewed}
+          accent="bg-amber-50 text-amber-600"
+        />
+        <StatCard
+          icon={<FileWarning size={22} />}
+          title="High Risk (≥75%)"
+          value={stats.highRisk}
+          accent="bg-red-50 text-red-600"
+        />
+        <StatCard
+          icon={<Users size={22} />}
+          title="Avg Similarity"
+          value={`${stats.avgSimilarity}%`}
+          accent="bg-slate-100 text-slate-700"
+        />
       </div>
-
 
       {/* Search + Filter + Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          {/* Search bar */}
           <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
             <input
               type="text"
-              placeholder="Search by student or assignment…"
+              placeholder="Search by student, enrollment ID, assignment or course…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
             />
           </div>
 
+          {/* Course filter */}
+          {courses.length > 0 && (
+            <div className="relative">
+              <BookOpen
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="pl-10 pr-8 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="All">All Courses</option>
+                {courses.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.courseCode ? `${c.courseCode} · ` : ""}
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Status filter */}
           <div className="relative">
-            <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Filter
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="pl-10 pr-8 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+              className="pl-10 pr-8 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
             >
-              <option value="All">All Status</option>
+              <option value="All">All Status & Tiers</option>
               <option value="Unreviewed">Unreviewed</option>
               <option value="Reviewed">Reviewed</option>
               <option value="Cleared">Cleared</option>
+              <option value="High Risk">🔴 High Risk (≥ 75%)</option>
+              <option value="Moderate">🟡 Moderate (50% - 74%)</option>
+              <option value="Original">🟢 Original (&lt; 50%)</option>
             </select>
           </div>
-
         </div>
 
-
+        {/* Submissions Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="pb-3 text-sm font-semibold text-slate-500">Student Name</th>
@@ -135,60 +276,115 @@ export default function Plagiarism() {
             </thead>
 
             <tbody>
-              {filtered.map((f) => (
-                <tr key={f.id} className="border-b border-slate-100 last:border-0">
+              {filtered.map((f) => {
+                const sName = f.student?.name || "Unknown Student";
+                const sId = f.student?.enrollmentId || "N/A";
+                const aTitle = f.assignment?.title || "Assignment";
+                const score = f.similarityScore || 0;
+                const isChecked = Boolean(f.checkedAt);
 
-                  <td className="py-4 font-medium text-slate-800">{f.studentName}</td>
+                return (
+                  <tr key={f._id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70 transition">
+                    <td className="py-4 font-medium text-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
+                          {sName.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{sName}</span>
+                      </div>
+                    </td>
 
-                  <td className="py-4 text-slate-600 text-sm font-mono">{f.enrollmentId}</td>
+                    <td className="py-4 text-slate-600 text-sm font-mono">{sId}</td>
 
-                  <td className="py-4 text-slate-600 text-sm">{f.assignment}</td>
+                    <td className="py-4 text-slate-700 text-sm font-medium">{aTitle}</td>
 
-                  <td className="py-4 text-slate-600 text-sm">{f.course}</td>
+                    <td className="py-4 text-slate-600 text-sm">
+                      {f.courseCode !== "N/A" ? `${f.courseCode} · ` : ""}
+                      {f.courseTitle}
+                    </td>
 
-                  <td className="py-4">
-                    <span className={`text-lg font-bold ${f.similarityPercentage >= 70 ? "text-red-600" : "text-amber-600"}`}>
-                      {f.similarityPercentage}%
-                    </span>
-                  </td>
+                    <td className="py-4">
+                      {isChecked ? (
+                        <span
+                          className={`text-lg font-bold ${
+                            score >= 75
+                              ? "text-red-600"
+                              : score >= 50
+                              ? "text-amber-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {score}%
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-sm font-medium">Pending Check</span>
+                      )}
+                    </td>
 
-                  <td className="py-4">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColor[f.status]}`}>
-                      {f.status}
-                    </span>
-                  </td>
+                    <td className="py-4">
+                      <select
+                        value={f.status}
+                        onChange={(e) => handleUpdateStatus(f._id, e.target.value)}
+                        disabled={updatingStatusId === f._id}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold border-none cursor-pointer outline-none transition ${
+                          f.status === "Unreviewed"
+                            ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                            : f.status === "Cleared"
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        <option value="Unreviewed">Unreviewed</option>
+                        <option value="Reviewed">Reviewed</option>
+                        <option value="Cleared">Cleared</option>
+                      </select>
+                    </td>
 
-                  <td className="py-4">
-                    <button
-                      onClick={() => handleReview(f.id)}
-                      disabled={loadingIds[f.id]}
-                      className="flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {loadingIds[f.id] ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
-                      {loadingIds[f.id] ? "Loading..." : "Review"}
-                    </button>
-                  </td>
-
-                </tr>
-              ))}
+                    <td className="py-4">
+                      <button
+                        onClick={() => handleReview(f)}
+                        className="inline-flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition cursor-pointer shadow-sm"
+                        title="Open detailed plagiarism report"
+                      >
+                        <Eye size={15} />
+                        Review
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
-
           </table>
 
-          {filtered.length === 0 && (
-            <p className="text-center text-slate-400 py-8">No flags found.</p>
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
+              <Loader2 size={20} className="animate-spin text-slate-400" />
+              <span>Loading real-time plagiarism records…</span>
+            </div>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <ShieldAlert size={36} className="mx-auto mb-2 text-slate-300" />
+              <p className="font-medium text-slate-600">No submissions found matching filters.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Submissions will appear here dynamically as students submit assignments and plagiarism checks are performed.
+              </p>
+            </div>
           )}
         </div>
-
       </div>
 
+      {/* Full Plagiarism Review Modal */}
+      {selectedSub && (
+        <PlagiarismModal
+          submission={selectedSub}
+          onClose={() => setSelectedSub(null)}
+        />
+      )}
     </div>
-
   );
-
 }
-
-
 
 function StatCard({ icon, title, value, accent }) {
   return (

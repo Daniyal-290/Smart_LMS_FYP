@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Plus, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import FacultySidebar from "@/components/FacultySidebar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -10,7 +10,12 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 export default function FacultyLayout({ children }) {
 
   const router = useRouter();
+  const pathname = usePathname();
   const [navigating, setNavigating] = useState(false);
+
+  useEffect(() => {
+    setNavigating(false);
+  }, [pathname]);
 
 
   return (
@@ -63,8 +68,10 @@ export default function FacultyLayout({ children }) {
 
               <button
                 onClick={() => {
+                  if (pathname === "/faculty/course/1/assignments") return;
                   setNavigating(true);
                   router.push("/faculty/course/1/assignments");
+                  setTimeout(() => setNavigating(false), 2000);
                 }}
                 disabled={navigating}
                 className="

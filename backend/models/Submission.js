@@ -92,6 +92,12 @@ const submissionSchema = new mongoose.Schema(
       default: 0,
     },
 
+    plagiarismStatus: {
+      type: String,
+      enum: ["Unreviewed", "Reviewed", "Cleared"],
+      default: "Unreviewed",
+    },
+
     plagiarismReport: {
       isFlagged: {
         type: Boolean,

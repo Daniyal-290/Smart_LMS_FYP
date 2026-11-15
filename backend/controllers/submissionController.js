@@ -149,7 +149,11 @@ const getCourseSubmissions = async (req, res) => {
     // Then find submissions for these assignments
     const submissions = await Submission.find({ assignment: { $in: assignmentIds } })
       .populate("student", "name email enrollmentId")
-      .populate("assignment", "title totalPoints prompt description")
+      .populate({
+        path: "assignment",
+        select: "title totalPoints prompt description course",
+        populate: { path: "course", select: "title courseCode" },
+      })
       .populate("plagiarismReport.matchedSubmissions.matchedStudentId", "name email enrollmentId")
       .populate("plagiarismReport.matchedSubmissions.matchedSubmissionId", "cleanedAnswerText content originalFileName");
 
@@ -160,4 +164,149 @@ const getCourseSubmissions = async (req, res) => {
   }
 };
 
-module.exports = { createSubmission, getMyGrades, getCourseSubmissions };
+// ===================================================
+// GET /api/submissions/instructor/plagiarism-flags
+// ===================================================
+// Protected: Instructor / Admin
+// Fetch all submissions with plagiarism data across all courses taught by the instructor.
+const getInstructorPlagiarismFlags = async (req, res) => {
+  try {
+    const Course = require("../models/Course");
+
+    // Find courses taught by instructor (or all courses if admin)
+    const filter = req.user.role === "Admin" ? {} : { instructor: req.user._id };
+    const courses = await Course.find(filter).select("title courseCode");
+    const courseIds = courses.map((c) => c._id);
+
+    // Find all assignments in these courses
+    const assignments = await Assignment.find({ course: { $in: courseIds } }).select(
+      "title totalPoints prompt description course"
+    );
+    const assignmentIds = assignments.map((a) => a._id);
+
+    // Find submissions for these assignments
+    const submissions = await Submission.find({ assignment: { $in: assignmentIds } })
+      .populate("student", "name email enrollmentId")
+      .populate({
+        path: "assignment",
+        select: "title totalPoints prompt description course",
+        populate: { path: "course", select: "title courseCode" },
+      })
+      .populate(
+        "plagiarismReport.matchedSubmissions.matchedStudentId",
+        "name email enrollmentId"
+      )
+      .populate(
+        "plagiarismReport.matchedSubmissions.matchedSubmissionId",
+        "cleanedAnswerText content originalFileName"
+      )
+      .sort({ updatedAt: -1 });
+
+    // Compute stats
+    let totalChecked = 0;
+    let totalFlags = 0; // >= 50%
+    let highRisk = 0; // >= 75%
+    let unreviewed = 0;
+    let totalScoreSum = 0;
+
+    const formattedList = submissions.map((sub) => {
+      const highestScore = Math.round(
+        sub.plagiarismReport?.highestSimilarityScore ?? sub.similarityScore ?? 0
+      );
+      const isChecked = Boolean(
+        sub.plagiarismReport?.checkedAt || sub.similarityScore !== undefined
+      );
+
+      if (isChecked && sub.plagiarismReport?.checkedAt) {
+        totalChecked++;
+        totalScoreSum += highestScore;
+        if (highestScore >= 50) {
+          totalFlags++;
+          if (sub.plagiarismStatus === "Unreviewed" || !sub.plagiarismStatus) {
+            unreviewed++;
+          }
+        }
+        if (highestScore >= 75) {
+          highRisk++;
+        }
+      }
+
+      const courseInfo = sub.assignment?.course;
+      return {
+        _id: sub._id,
+        student: sub.student,
+        assignment: sub.assignment,
+        courseTitle: courseInfo?.title || "Unknown Course",
+        courseCode: courseInfo?.courseCode || "N/A",
+        similarityScore: highestScore,
+        isFlagged: sub.isFlagged || highestScore >= 75,
+        status: sub.plagiarismStatus || (highestScore >= 50 ? "Unreviewed" : "Cleared"),
+        checkedAt: sub.plagiarismReport?.checkedAt || null,
+        plagiarismReport: sub.plagiarismReport,
+        cleanedAnswerText: sub.cleanedAnswerText,
+        content: sub.content,
+        fileUrl: sub.fileUrl,
+        originalFileName: sub.originalFileName,
+      };
+    });
+
+    const avgSimilarity =
+      totalChecked > 0 ? (totalScoreSum / totalChecked).toFixed(1) : "0.0";
+
+    res.status(200).json({
+      stats: {
+        totalChecked,
+        totalFlags,
+        unreviewed,
+        highRisk,
+        avgSimilarity,
+      },
+      flags: formattedList,
+      courses,
+    });
+  } catch (error) {
+    console.error("Get Instructor Plagiarism Flags Error:", error.message);
+    res.status(500).json({ message: "Server error fetching plagiarism flags" });
+  }
+};
+
+// ===================================================
+// PATCH /api/submissions/:id/plagiarism-status
+// ===================================================
+// Protected: Instructor / Admin
+// Updates the review status of a plagiarism flag ("Unreviewed", "Reviewed", "Cleared").
+const updatePlagiarismStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["Unreviewed", "Reviewed", "Cleared"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const submission = await Submission.findById(id);
+    if (!submission) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    submission.plagiarismStatus = status;
+    await submission.save();
+
+    res.status(200).json({
+      message: `Status updated to ${status}`,
+      submissionId: id,
+      status,
+    });
+  } catch (error) {
+    console.error("Update Plagiarism Status Error:", error.message);
+    res.status(500).json({ message: "Server error updating plagiarism status" });
+  }
+};
+
+module.exports = {
+  createSubmission,
+  getMyGrades,
+  getCourseSubmissions,
+  getInstructorPlagiarismFlags,
+  updatePlagiarismStatus,
+};

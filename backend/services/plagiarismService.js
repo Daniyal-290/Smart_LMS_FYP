@@ -120,11 +120,38 @@ async function extractRawSubmissionText(submission) {
 // ===================================================
 // Step 1: Question & Boilerplate Stripping
 // ===================================================
+// Local rule-based question & header stripping (fast fallback)
+function localCleanText(rawText, assignment) {
+  if (!rawText) return "";
+  let text = rawText;
+
+  // 1. Remove markdown code fences
+  text = text.replace(/^```[a-z]*\n?/gim, "").replace(/\n?```$/gim, "");
+
+  // 2. Remove standard student/assignment headers
+  text = text.replace(/^(Name|Student Name|Roll No|Enrollment ID|Course|Instructor|Assignment|Date|Title):\s*[^\n]*$/gim, "");
+
+  // 3. Remove question headers like "Question 1:", "Q1.", "Part (a):"
+  text = text.replace(/^(Question\s*\d+|Q\d+|Part\s*\([a-z0-9]+\)|Problem\s*\d+):?\s*$/gim, "");
+
+  // 4. Strip prompt text lines if present
+  if (assignment?.prompt) {
+    const promptLines = assignment.prompt.split("\n").map((l) => l.trim()).filter((l) => l.length > 20);
+    for (const pLine of promptLines) {
+      text = text.split(pLine).join("");
+    }
+  }
+
+  return text.trim() || rawText.trim();
+}
+
 // Strips questions, headers (student name, roll no), and formatting noise.
 async function stripBoilerplateAndQuestions(rawText, assignment) {
   if (!rawText || !rawText.trim()) {
     return "";
   }
+
+  const fallback = localCleanText(rawText, assignment);
 
   const assignmentContext = [
     `Title: ${assignment.title || ""}`,
@@ -165,10 +192,10 @@ STRICT RULES:
 
     let cleaned = (res.text || "").trim();
     cleaned = cleaned.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-    return cleaned || rawText;
+    return cleaned || fallback;
   } catch (err) {
-    console.warn("Question stripping fallback to raw text:", err.message);
-    return rawText;
+    console.warn("Question stripping fallback to local cleaned text:", err.message);
+    return fallback;
   }
 }
 
@@ -262,23 +289,25 @@ Respond with ONLY a JSON object in this EXACT shape:
     let finalType = parsed.flaggedType || "Safe";
     let reasoning = parsed.reasoning || "Similarity evaluated.";
 
-    // Guardrail against AI leniency at high vector similarities:
-    if (cosinePercent >= 75) {
-      // Ensure score is at least the measured cosine similarity
-      finalScore = Math.max(cosinePercent, finalScore);
+    // Guardrail against AI leniency at exceptionally high vector similarities:
+    // Check if the assignment is math/formula-heavy
+    const isMathAssignment = /math|calculus|algebra|equation|differential|derivative|integral|formula/i.test(
+      `${assignment?.title || ""} ${assignment?.prompt || ""}`
+    );
 
-      // Overwhelming vector similarity cannot be classified as "Safe"
+    // If non-math assignment and vector similarity is high (>= 85%),
+    // independent students do not write nearly-identical essays by accident.
+    if (!isMathAssignment && cosinePercent >= 85) {
+      finalScore = Math.max(75, Math.max(cosinePercent, finalScore));
       if (finalType === "Safe") {
-        if (cosinePercent >= 85) {
-          finalType = "Direct Copy";
-          reasoning = `High vector similarity (${cosinePercent}%); extensive overlap in phrasing, structure, and illustrative examples detected.`;
-        } else {
-          finalType = "Paraphrased";
-          reasoning = `Substantial similarity (${cosinePercent}%); shared explanatory structure and concept flow detected.`;
-        }
+        finalType = cosinePercent >= 92 ? "Direct Copy" : "Paraphrased";
+        reasoning = `High vector similarity (${cosinePercent}%); extensive overlap in phrasing, structure, or illustrative examples detected.`;
       }
-    } else if (cosinePercent >= 50) {
-      finalScore = Math.max(cosinePercent, finalScore);
+    } else if (!isMathAssignment && cosinePercent >= 75 && finalType === "Safe") {
+      // If cosine >= 75% on theory and AI returned Safe, calibrate to Moderate (50-70%)
+      finalScore = Math.max(50, Math.min(70, finalScore));
+      finalType = "Paraphrased";
+      reasoning = reasoning || `Substantial conceptual and structural overlap (${cosinePercent}%).`;
     }
 
     return {
@@ -287,10 +316,11 @@ Respond with ONLY a JSON object in this EXACT shape:
       reasoning: reasoning,
     };
   } catch (err) {
-    console.warn("AI verification error, falling back to cosine baseline:", err.message);
-    const fallbackType = cosinePercent >= 85 ? "Direct Copy" : cosinePercent >= 75 ? "Paraphrased" : "Safe";
+    console.warn("AI verification error, falling back to calibrated cosine baseline:", err.message);
+    const fallbackScore = Math.min(100, Math.round(35 + ((cosineVal - 0.70) / 0.30) * 65));
+    const fallbackType = fallbackScore >= 75 ? (cosinePercent >= 88 ? "Direct Copy" : "Paraphrased") : "Safe";
     return {
-      aiVerifiedScore: cosinePercent,
+      aiVerifiedScore: fallbackScore,
       flaggedType: fallbackType,
       reasoning: `Vector similarity measured at ${cosinePercent}%.`,
     };
@@ -336,25 +366,41 @@ async function compareSubmissionPair(subA, subB, assignment) {
   const cosine = cosineSimilarity(subA.embedding, subB.embedding);
   const cosinePercent = Math.round(cosine * 100);
 
-  if (cosine >= 0.50) {
-    const aiResult = await verifyPlagiarismWithAI(
-      subA.cleanedAnswerText || "",
-      subB.cleanedAnswerText || "",
-      assignment,
-      cosine
-    );
+  // If cosine similarity is >= 0.70 (70%), run secondary AI verification check
+  if (cosine >= 0.70) {
+    try {
+      const aiResult = await verifyPlagiarismWithAI(
+        subA.cleanedAnswerText || "",
+        subB.cleanedAnswerText || "",
+        assignment,
+        cosine
+      );
 
-    return {
-      cosineSimilarity: cosine,
-      aiVerifiedScore: Math.max(cosinePercent, aiResult.aiVerifiedScore),
-      reasoning: aiResult.reasoning,
-      flaggedType: aiResult.flaggedType,
-    };
+      return {
+        cosineSimilarity: cosine,
+        aiVerifiedScore: aiResult.aiVerifiedScore,
+        reasoning: aiResult.reasoning,
+        flaggedType: aiResult.flaggedType,
+      };
+    } catch (err) {
+      console.warn("AI pair comparison warning, using calibrated fallback:", err.message);
+      const fallbackScore = Math.min(100, Math.round(35 + ((cosine - 0.70) / 0.30) * 65));
+      const fallbackType = fallbackScore >= 75 ? (cosine >= 0.88 ? "Direct Copy" : "Paraphrased") : "Safe";
+      return {
+        cosineSimilarity: cosine,
+        aiVerifiedScore: fallbackScore,
+        reasoning: `Vector similarity measured at ${cosinePercent}%.`,
+        flaggedType: fallbackType,
+      };
+    }
   }
 
+  // Below 0.70: Independent student work with normal vocabulary overlap
+  // Calibrate raw cosine (0.45 - 0.70) to clean 0% - 35% Original score:
+  const baselineScore = Math.max(0, Math.min(35, Math.round(((cosine - 0.45) / 0.25) * 35)));
   return {
     cosineSimilarity: cosine,
-    aiVerifiedScore: cosinePercent,
+    aiVerifiedScore: baselineScore,
     reasoning: "Independent submission with standard vocabulary overlap.",
     flaggedType: "Safe",
   };
@@ -426,8 +472,7 @@ async function checkSingleSubmissionPlagiarism(submissionId, assignmentId) {
     });
 
     const peerHighest = peerMatches.reduce(
-      (max, m) =>
-        Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
+      (max, m) => Math.max(max, m.aiVerifiedScore || 0),
       0
     );
 
@@ -443,8 +488,7 @@ async function checkSingleSubmissionPlagiarism(submissionId, assignmentId) {
   }
 
   const highestScore = currentMatches.reduce(
-    (max, m) =>
-      Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
+    (max, m) => Math.max(max, m.aiVerifiedScore || 0),
     0
   );
 
@@ -534,8 +578,7 @@ async function runBatchPlagiarismCheck(assignmentId) {
   for (const sub of submissions) {
     const matches = matchMap.get(sub._id.toString()) || [];
     const highest = matches.reduce(
-      (max, m) =>
-        Math.max(max, m.aiVerifiedScore || 0, Math.round((m.cosineSimilarity || 0) * 100)),
+      (max, m) => Math.max(max, m.aiVerifiedScore || 0),
       0
     );
     const isFlagged = highest >= 75;
@@ -556,6 +599,7 @@ async function runBatchPlagiarismCheck(assignmentId) {
   const updatedSubmissions = await Submission.find({ assignment: assignmentId })
     .populate("student", "name email enrollmentId")
     .populate("plagiarismReport.matchedSubmissions.matchedStudentId", "name email enrollmentId")
+    .populate("plagiarismReport.matchedSubmissions.matchedSubmissionId", "cleanedAnswerText content originalFileName")
     .populate("assignment", "title totalPoints");
 
   return {

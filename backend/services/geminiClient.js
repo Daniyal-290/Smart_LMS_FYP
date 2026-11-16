@@ -17,7 +17,7 @@ if (!process.env.GEMINI_API_KEY) {
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Default model — can be overridden in .env without touching code.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 const FALLBACK_MODELS = [
   "gemini-3.5-flash-lite",
@@ -26,6 +26,17 @@ const FALLBACK_MODELS = [
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const exhaustedDailyModels = new Set();
+
+function isDailyQuotaError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return (
+    msg.includes("per day limit exceeded") ||
+    msg.includes("generaterequestsperday") ||
+    msg.includes("please retry in")
+  );
+}
 
 function isTransientError(err) {
   const status = err?.status || err?.code;
@@ -47,10 +58,18 @@ function isTransientError(err) {
  * model remains unavailable.
  */
 async function generateWithRetry({ contents, config, model = GEMINI_MODEL }) {
-  const candidateModels = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
+  const candidateModels = [
+    model,
+    ...FALLBACK_MODELS.filter((m) => m !== model),
+  ].filter((m, idx, arr) => arr.indexOf(m) === idx);
+
   let lastError;
 
   for (const candidate of candidateModels) {
+    if (exhaustedDailyModels.has(candidate)) {
+      continue; // Skip models known to have exhausted their daily quota
+    }
+
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -61,20 +80,27 @@ async function generateWithRetry({ contents, config, model = GEMINI_MODEL }) {
         });
       } catch (err) {
         lastError = err;
+
+        if (isDailyQuotaError(err)) {
+          console.warn(`Model ${candidate} exhausted its daily quota. Skipping to next fallback.`);
+          exhaustedDailyModels.add(candidate);
+          break; // Don't retry on the same model if daily quota is exhausted
+        }
+
         if (!isTransientError(err)) {
           throw err;
         }
-        const delayMs = attempt * 2000;
+
+        const delayMs = attempt * 1000;
         console.warn(
           `Gemini transient error on ${candidate} (attempt ${attempt}/${maxAttempts}): ${err.message}. Retrying...`
         );
         await sleep(delayMs);
       }
     }
-    console.warn(`Switching from ${candidate} to next fallback Gemini model due to unavailability.`);
   }
 
-  throw lastError;
+  throw lastError || new Error("All Gemini candidate models are currently unavailable.");
 }
 
 /**

@@ -33,12 +33,7 @@ export default function PlagiarismModal({ submission, onClose }) {
   const isFlagged = report.isFlagged || highestScore >= 75;
   const isModerate = !isFlagged && highestScore >= 50;
 
-  const currentMatchScore = Math.round(
-    Math.max(
-      currentMatch?.aiVerifiedScore || 0,
-      (currentMatch?.cosineSimilarity || 0) * 100
-    )
-  );
+  const currentMatchScore = Math.round(currentMatch?.aiVerifiedScore ?? 0);
 
   const getTagClass = (type, score) => {
     if (score >= 75) {
@@ -54,9 +49,7 @@ export default function PlagiarismModal({ submission, onClose }) {
 
   const getDisplayTag = (match) => {
     if (!match) return "Safe";
-    const score = Math.round(
-      Math.max(match.aiVerifiedScore || 0, (match.cosineSimilarity || 0) * 100)
-    );
+    const score = Math.round(match.aiVerifiedScore ?? 0);
     let type = match.flaggedType || "Safe";
     if (score >= 75 && type === "Safe") {
       type = "Plagiarism Detected";
@@ -170,9 +163,7 @@ export default function PlagiarismModal({ submission, onClose }) {
               <div className="plag-peer-selector">
                 {matches.map((m, idx) => {
                   const sName = m.matchedStudentId?.name || `Classmate ${idx + 1}`;
-                  const pScore = Math.round(
-                    Math.max(m.aiVerifiedScore || 0, (m.cosineSimilarity || 0) * 100)
-                  );
+                  const pScore = Math.round(m.aiVerifiedScore ?? 0);
                   let tierText = `Original (${pScore}%)`;
                   if (pScore >= 75) {
                     tierText = `Plagiarised (${pScore}%)`;

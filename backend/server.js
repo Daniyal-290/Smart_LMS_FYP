@@ -38,6 +38,24 @@ app.use(express.json());          // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true }));
 
 // ---------------------------------------------------
+// Ensure MongoDB Connection (Serverless-Safe for Vercel)
+// ---------------------------------------------------
+// Awaits connectDB() before routing requests so queries don't run
+// against an unconnected mongoose instance during cold starts.
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("Database connection middleware error:", err.message);
+    res.status(503).json({
+      message: "Database connection failed. Please check MONGO_URI in environment variables.",
+      error: err.message,
+    });
+  }
+});
+
+// ---------------------------------------------------
 // Serve Uploaded Files (MongoDB + Local Disk Fallback)
 // ---------------------------------------------------
 app.get("/uploads/:filename", async (req, res) => {
@@ -117,16 +135,20 @@ app.use((err, req, res, next) => {
 });
 
 // ---------------------------------------------------
-// Start Server
+// Start Server (Local Development)
 // ---------------------------------------------------
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-      console.log(`🚀 SmartLMS server running on port ${PORT}`);
+if (process.env.NODE_ENV !== "production") {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`🚀 SmartLMS server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Local initial connectDB error:", err.message);
     });
-  }
-});
+}
 
 module.exports = app; // Required for Vercel Serverless Functions

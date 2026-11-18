@@ -32,7 +32,13 @@ const uploadedFileSchema = new mongoose.Schema(
     },
     data: {
       type: Buffer,
-      required: true,
+      required: [true, "File buffer data is required"],
+      validate: {
+        validator: function (v) {
+          return Buffer.isBuffer(v) && v.length > 0;
+        },
+        message: "File data must be a non-empty Buffer",
+      },
     },
   },
   { timestamps: true }

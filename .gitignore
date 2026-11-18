@@ -6,4 +6,6 @@ node_modules/
 # Ignore every .env file
 
 .env
+.env.local
+.env*.local
 uploads/

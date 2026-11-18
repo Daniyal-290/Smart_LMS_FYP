@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import QuickActions from "@/components/QuickActions";
 
-const API_URL = "http://localhost:5000/api";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const API_URL = `${BACKEND_URL}/api`;
 
 export default function ViewCourse() {
   const router = useRouter();
@@ -228,7 +229,7 @@ export default function ViewCourse() {
                         Preview Quiz
                       </button>
                       <a
-                        href={`http://localhost:5000${lecture.fileUrl}`}
+                        href={`${BACKEND_URL}${lecture.fileUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition text-sm font-medium"

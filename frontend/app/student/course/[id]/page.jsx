@@ -3,7 +3,8 @@
 import { useRouter, useParams } from "next/navigation";
 import { Download, ArrowLeft, BookOpen, Info, Megaphone, CalendarClock, Loader2, BrainCircuit } from "lucide-react";
 import { useState, useEffect } from "react";
-const API_URL = "http://localhost:5000/api";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const API_URL = `${BACKEND_URL}/api`;
 
 export default function ViewCourse() {
   const router = useRouter();
@@ -196,7 +197,7 @@ export default function ViewCourse() {
                         Practice Quiz
                       </button>
                       <a
-                        href={`http://localhost:5000${lecture.fileUrl}`}
+                        href={`${BACKEND_URL}${lecture.fileUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={handleDownload}

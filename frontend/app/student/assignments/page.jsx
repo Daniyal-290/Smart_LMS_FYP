@@ -10,7 +10,8 @@ import {
   Loader2,
 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const API_URL = `${BACKEND_URL}/api`;
 
 export default function Assignments() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function Assignments() {
                   {assignment.attachmentUrl && (
                     <div className="mt-4">
                       <a
-                        href={`http://localhost:5000${assignment.attachmentUrl}`}
+                        href={`${BACKEND_URL}${assignment.attachmentUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition"

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { BookOpen, UserCheck, CalendarDays, Hash, Loader2 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 const COURSE_CATALOG = [
   { id: "CS-101", name: "Introduction to Computing" },

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { Loader2 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 export default function MyCourses() {
   const router = useRouter();

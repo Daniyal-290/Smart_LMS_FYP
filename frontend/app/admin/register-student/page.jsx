@@ -4,7 +4,7 @@ import { useState } from "react";
 import { User, Mail, Hash, BookOpen, Lock, GraduationCap, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 export default function RegisterStudent() {
   const [formData, setFormData] = useState({

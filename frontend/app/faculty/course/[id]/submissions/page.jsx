@@ -20,7 +20,8 @@ import {
 import { toast } from "react-toastify";
 import PlagiarismBadge from "@/components/PlagiarismBadge";
 import PlagiarismModal from "@/components/PlagiarismModal";
-const API_URL = "http://localhost:5000/api";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const API_URL = `${BACKEND_URL}/api`;
 
 export default function ViewSubmissions() {
   const params = useParams();
@@ -554,7 +555,7 @@ export default function ViewSubmissions() {
                             <td className="text-center">
                               {item.fileUrl ? (
                                 <a
-                                  href={`http://localhost:5000${item.fileUrl}`}
+                                  href={`${BACKEND_URL}${item.fileUrl}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:underline"

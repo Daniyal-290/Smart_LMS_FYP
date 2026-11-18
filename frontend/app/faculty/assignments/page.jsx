@@ -18,7 +18,7 @@ import {
 import { toast } from "react-toastify";
 import { useFacultyOverview } from "../../../hooks/useFacultyOverview";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 export default function FacultyAssignments() {
   const { assignments, loading, error, refetch } = useFacultyOverview();

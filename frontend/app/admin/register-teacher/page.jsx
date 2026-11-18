@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import { UserPlus, Loader2 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 export default function RegisterTeacher() {
   const [name, setName] = useState("");

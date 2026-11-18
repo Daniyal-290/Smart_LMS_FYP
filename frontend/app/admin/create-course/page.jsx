@@ -5,7 +5,7 @@ import { BookOpen, Hash, GraduationCap, FileText, Loader2, User } from "lucide-r
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "")}/api`;
 
 export default function CreateCourse() {
   const router = useRouter();

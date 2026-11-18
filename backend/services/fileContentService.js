@@ -1,26 +1,23 @@
 const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
+const UploadedFile = require("../models/UploadedFile");
 
 // ===================================================
 // fileContentService
 // ===================================================
-// Turns a file stored under /backend/uploads (referenced by
-// its DB `fileUrl`, e.g. "/uploads/12345-photo.jpg") into one
-// or more Gemini "parts" — the format the Gemini API expects
-// inside `contents`.
+// Turns a file stored in MongoDB or under /backend/uploads
+// (referenced by its DB `fileUrl`, e.g. "/uploads/12345-photo.jpg")
+// into one or more Gemini "parts" — the format the Gemini API
+// expects inside `contents`.
 //
-// Supported today:
-//   - Images (jpg/jpeg/png/webp)  -> inlineData (Gemini vision reads
-//                                    handwritten text/math directly,
-//                                    no separate OCR step needed)
-//   - PDFs                        -> inlineData (Gemini reads PDFs natively)
+// Supported:
+//   - Images (jpg/jpeg/png/webp)  -> inlineData (Gemini vision)
+//   - PDFs                        -> inlineData (Gemini PDF)
 //   - Word docs (.docx)           -> extracted as plain text via mammoth
+//   - PPTX slides                 -> extracted via officeparser / fflate
 //   - Code/text files             -> read as plain text
 //     (.js .ts .py .java .c .cpp .cs .txt .md .json .html .css)
-//
-// Not supported yet (will throw a clear error instead of failing silently):
-//   - .pptx, .mp4, and other binary/office formats not listed above.
 
 const IMAGE_MIME_BY_EXT = {
   ".jpg": "image/jpeg",
@@ -44,30 +41,57 @@ function resolveUploadPath(fileUrl) {
 }
 
 /**
+ * Retrieves the raw file Buffer, prioritizing MongoDB (UploadedFile) for cloud/Vercel
+ * serverless persistence, with a fallback to local disk.
+ */
+async function getFileBuffer(fileUrl) {
+  if (!fileUrl) return null;
+  const filename = path.basename(fileUrl);
+
+  // 1. Look up file in MongoDB (Primary cloud/Vercel storage)
+  try {
+    const fileDoc = await UploadedFile.findOne({ filename });
+    if (fileDoc && fileDoc.data) {
+      return fileDoc.data;
+    }
+  } catch (err) {
+    console.warn("Could not retrieve file from MongoDB:", err.message);
+  }
+
+  // 2. Fallback to local disk (for legacy local development files)
+  const absolutePath = resolveUploadPath(fileUrl);
+  if (fs.existsSync(absolutePath)) {
+    return fs.readFileSync(absolutePath);
+  }
+
+  return null;
+}
+
+/**
  * Converts a stored submission/rubric/assignment file into Gemini content parts.
  * Returns an array of parts, e.g. [{ inlineData: {...} }] or [{ text: "..." }]
  */
 async function fileToGeminiParts(fileUrl, originalFileName = "") {
-  const absolutePath = resolveUploadPath(fileUrl);
+  const buffer = await getFileBuffer(fileUrl);
 
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error(`File not found on disk: ${absolutePath}`);
+  if (!buffer) {
+    throw new Error(`File not found in database or on disk: ${fileUrl}`);
   }
 
   const ext = path.extname(originalFileName || fileUrl).toLowerCase();
 
   if (IMAGE_MIME_BY_EXT[ext]) {
-    const data = fs.readFileSync(absolutePath).toString("base64");
+    const data = buffer.toString("base64");
     return [{ inlineData: { mimeType: IMAGE_MIME_BY_EXT[ext], data } }];
   }
 
   if (ext === ".pdf") {
-    const data = fs.readFileSync(absolutePath).toString("base64");
+    const data = buffer.toString("base64");
     return [{ inlineData: { mimeType: "application/pdf", data } }];
   }
 
   if (ext === ".docx") {
-    const result = await mammoth.extractRawText({ path: absolutePath });
+    const result = await mammoth.extractRawText({ buffer });
     return [{ text: result.value }];
   }
 
@@ -77,7 +101,7 @@ async function fileToGeminiParts(fileUrl, originalFileName = "") {
       const { OfficeParser, parseOffice } = require("officeparser");
       const fn = (OfficeParser && typeof OfficeParser.parseOffice === "function") ? OfficeParser.parseOffice : parseOffice;
       if (fn) {
-        const ast = await fn(absolutePath);
+        const ast = await fn(buffer);
         const extractedText = typeof ast === "string" ? ast : (ast && typeof ast.toText === "function" ? ast.toText() : "");
         if (extractedText && extractedText.trim()) {
           return [{ text: extractedText.trim() }];
@@ -90,8 +114,7 @@ async function fileToGeminiParts(fileUrl, originalFileName = "") {
     // Attempt 2: Extract directly from XML slides in PPTX zip archive using fflate
     try {
       const fflate = require("officeparser/node_modules/fflate") || require("fflate");
-      const fileBuffer = fs.readFileSync(absolutePath);
-      const unzippedFiles = fflate.unzipSync(fileBuffer);
+      const unzippedFiles = fflate.unzipSync(buffer);
       const slideTexts = [];
 
       for (const [filename, fileData] of Object.entries(unzippedFiles)) {
@@ -117,7 +140,7 @@ async function fileToGeminiParts(fileUrl, originalFileName = "") {
   }
 
   if (TEXT_EXTENSIONS.has(ext)) {
-    const content = fs.readFileSync(absolutePath, "utf-8");
+    const content = buffer.toString("utf-8");
     return [{ text: content }];
   }
 
@@ -126,4 +149,4 @@ async function fileToGeminiParts(fileUrl, originalFileName = "") {
   );
 }
 
-module.exports = { fileToGeminiParts, resolveUploadPath };
+module.exports = { fileToGeminiParts, resolveUploadPath, getFileBuffer };

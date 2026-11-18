@@ -27,6 +27,8 @@ const quizRoutes = require("./routes/quizRoutes");
 const app = express();
 
 const path = require("path");
+const fs = require("fs");
+const UploadedFile = require("./models/UploadedFile");
 
 // ---------------------------------------------------
 // Global Middleware
@@ -34,12 +36,37 @@ const path = require("path");
 app.use(cors());                  // Enable CORS for frontend
 app.use(express.json());          // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/uploads", (req, res) => {
-  res.status(404).json({
-    message:
-      "Uploaded file not found on this server. If this record was created on another machine, please re-upload the file.",
-  });
+
+// ---------------------------------------------------
+// Serve Uploaded Files (MongoDB + Local Disk Fallback)
+// ---------------------------------------------------
+app.get("/uploads/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+
+    // 1. Look up file in MongoDB (Primary storage for Vercel/cloud)
+    const file = await UploadedFile.findOne({ filename });
+    if (file && file.data) {
+      res.set("Content-Type", file.mimetype || "application/octet-stream");
+      res.set("Content-Length", file.size || file.data.length);
+      return res.send(file.data);
+    }
+
+    // 2. Fallback to local disk (for legacy local development files)
+    const localFilePath = path.join(__dirname, "uploads", filename);
+    if (fs.existsSync(localFilePath)) {
+      return res.sendFile(localFilePath);
+    }
+
+    // 3. File not found
+    return res.status(404).json({
+      message:
+        "Uploaded file not found on this server. If this record was created on another machine, please re-upload the file.",
+    });
+  } catch (error) {
+    console.error("Error serving uploaded file:", error);
+    res.status(500).json({ message: "Error retrieving file" });
+  }
 });
 
 // ---------------------------------------------------

@@ -10,7 +10,7 @@ const {
   embedContentWithRetry,
   extractJson,
 } = require("./geminiClient");
-const { resolveUploadPath, fileToGeminiParts } = require("./fileContentService");
+const { resolveUploadPath, fileToGeminiParts, getFileBuffer } = require("./fileContentService");
 
 // ===================================================
 // Cosine Similarity Utility
@@ -54,28 +54,28 @@ async function extractRawSubmissionText(submission) {
   }
 
   try {
-    const absolutePath = resolveUploadPath(submission.fileUrl);
-    if (!fs.existsSync(absolutePath)) {
+    const fileBuffer = await getFileBuffer(submission.fileUrl);
+    if (!fileBuffer) {
       return text;
     }
 
     const ext = path.extname(submission.originalFileName || submission.fileUrl).toLowerCase();
 
     if (ext === ".docx") {
-      const result = await mammoth.extractRawText({ path: absolutePath });
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
       const docxText = (result.value || "").trim();
       text = text ? `${text}\n\n${docxText}` : docxText;
     } else if (
       [".txt", ".md", ".json", ".js", ".jsx", ".ts", ".tsx", ".py", ".java", ".c", ".cpp", ".cs", ".html", ".css"].includes(ext)
     ) {
-      const fileText = fs.readFileSync(absolutePath, "utf-8").trim();
+      const fileText = fileBuffer.toString("utf-8").trim();
       text = text ? `${text}\n\n${fileText}` : fileText;
     } else if (ext === ".pptx" || ext === ".ppt") {
       try {
         const { OfficeParser, parseOffice } = require("officeparser");
         const fn = OfficeParser && typeof OfficeParser.parseOffice === "function" ? OfficeParser.parseOffice : parseOffice;
         if (fn) {
-          const ast = await fn(absolutePath);
+          const ast = await fn(fileBuffer);
           const pptText = typeof ast === "string" ? ast : ast && typeof ast.toText === "function" ? ast.toText() : "";
           if (pptText && pptText.trim()) {
             text = text ? `${text}\n\n${pptText.trim()}` : pptText.trim();
